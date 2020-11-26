@@ -56,9 +56,9 @@ fcmd_init_gituser() {
   useradd -d "$git_home" "$git_user" || true
   mkdir -p "$git_home/.ssh"
   touch "$git_home/.ssh/authorized_keys"
-  chown -R "$git_user" "$git_home"
   cp "$ZSCRIPT_PATH" "$git_home"
-  chmod +x "$ZSCRIPT_PATH"
+  chmod +x "$git_home/zcloud"
+  chown -R "$git_user" "$git_home"
   echo "Created user '$git_user' with '$git_home' directory."
 }
 
@@ -80,9 +80,10 @@ cmd_create() {
     cat > "$postreceive_path" <<EOF
 #!/usr/bin/env bash
 set -eo pipefail;
-../../zcloud git-post-receive
+"\$PWD/../zcloud" git-post-receive
 EOF
     chmod +x "$postreceive_path"
+    chown -R "$ZGIT_USER" "$repo_path"
     echo "Created app '$name' at '$repo_path'"
   else
     echo "Failed to create duplicate app '$name'"
