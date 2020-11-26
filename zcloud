@@ -1,5 +1,6 @@
-#!/bin/bash
+#!/usr/bin/env bash
 ZEXENAME=$(basename $0)
+ZSCRIPT_PATH=$(readlink -m $( type -p $0 ))
 
 if [ -f "/etc/arch-release" ]; then
   export ZPKG_MANAGER="pacman"
@@ -13,12 +14,13 @@ export ZROOT_DOMAIN="${ZROOT_DOMAIN:-}"
 export ZCA_SERVER="${ZCA_SERVER:-production}"
 export ZGIT_USER="${ZGIT_USER:-git}"
 export ZGIT_HOME="${ZGIT_HOME:-/home/$ZGIT_USER}"
+export ZGIT_PATH="${ZGIT_PATH:-git}"
 
 cmd_help() {
   echo "Usage: $ZEXENAME <subcommand> [options]"
   echo "Subcommands:"
   echo "   install        Install prerequisites (requires sudo)"
-  echo "   init           Initializes server"
+  echo "   init           Initializes server (requires sudo)"
   echo "   create <name>  Create empty app"
   echo "   help           Show help"
 }
@@ -40,7 +42,6 @@ cmd_install() {
 
 cmd_init() {
   fcmd_init_gituser "$ZGIT_HOME" "$ZGIT_USER"
-  fcmd_init_gitreceiverscript "$ZGIT_HOME" "$ZGIT_USER"
   echo
   echo "Be sure to upload a public key for your user to $ZGIT_HOME/.ssh/authorized_keys"
 }
@@ -56,22 +57,9 @@ fcmd_init_gituser() {
   mkdir -p "$git_home/.ssh"
   touch "$git_home/.ssh/authorized_keys"
   chown -R "$git_user" "$git_home"
+  cp "$ZSCRIPT_PATH" "$git_home"
+  chmod +x "$ZSCRIPT_PATH"
   echo "Created user '$git_user' with '$git_home' directory."
-}
-
-# Creates a sample receiver script.
-# This is the script that is triggered after a successful push.
-fcmd_init_gitreceiverscript() {
-  echo "Initializing git receiver script"
-  declare git_home="$1" git_user="$2" || true
-  local receiver_path="$git_home/receiver"
-  cat > "$receiver_path" <<EOF
-#!/bin/bash
-
-EOF
-  chmod +x "$receiver_path"
-  chown "$git_user" "$receiver_path"
-  echo "Created git receiver script '$receiver_path' for user '$git_user'."
 }
 
 cmd_create() {
@@ -86,13 +74,24 @@ cmd_create() {
   if [ ! -d "$repo_path" ]; then
     mkdir -p "$repo_path"
     cd "$repo_path"
-    git init --bare
+    "$ZGIT_PATH" init --bare
     cd -
+    local postreceive_path="$repo_path/hooks/post-receive"
+    cat > "$postreceive_path" <<EOF
+#!/usr/bin/env bash
+set -eo pipefail;
+../../zcloud git-post-receive
+EOF
+    chmod +x "$postreceive_path"
     echo "Created app '$name' at '$repo_path'"
   else
     echo "Failed to create duplicate app '$name'"
     exit 1
   fi
+}
+
+cmd_git-post-receive() {
+  echo "git post receive"
 }
 
 subcommand=$1
