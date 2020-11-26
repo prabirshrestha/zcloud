@@ -19,7 +19,7 @@ cmd_help() {
   echo "Subcommands:"
   echo "   install        Install prerequisites (requires sudo)"
   echo "   init           Initializes server"
-	echo "   create <name>  Create empty app" 
+  echo "   create <name>  Create empty app"
   echo "   help           Show help"
 }
 
@@ -76,7 +76,7 @@ EOF
 
 cmd_create() {
   declare name="$1"
-	declare repo_path="$ZGIT_HOME/$name"
+  declare repo_path="$ZGIT_HOME/$name"
   if [ "$name" = "" ]; then
     echo "Name required"
     exit 1
@@ -90,7 +90,7 @@ cmd_create() {
     echo "Created app '$1' at '$repo_path'"
 	else
     echo "Failed to create app. Directory exists at '$repo_path'"
-		exit 1
+    exit 1
   fi
 }
 
