@@ -17,9 +17,10 @@ export ZGIT_HOME="${ZGIT_HOME:-/home/$ZGIT_USER}"
 cmd_help() {
   echo "Usage: $ZEXENAME <subcommand> [options]"
   echo "Subcommands:"
-  echo "   install    Install prerequisites (requires sudo)"
-  echo "   init       Initializes server"
-  echo "   help       Show help"
+  echo "   install        Install prerequisites (requires sudo)"
+  echo "   init           Initializes server"
+	echo "   create <name>  Create empty app" 
+  echo "   help           Show help"
 }
 
 cmd_install() {
@@ -34,14 +35,14 @@ cmd_install() {
   else
     $ZSUDO "$ZPKG_MANAGER" update -y -qq
     $ZSUDO "$ZPKG_MANAGER" install -y -qq git docker.io apt-transport-https
-	fi
+  fi
 }
 
 cmd_init() {
   fcmd_init_gituser "$ZGIT_HOME" "$ZGIT_USER"
   fcmd_init_gitreceiverscript "$ZGIT_HOME" "$ZGIT_USER"
   echo
-	echo "Be sure to upload a public key for your user to $ZGIT_HOME/.ssh/authorized_keys"
+  echo "Be sure to upload a public key for your user to $ZGIT_HOME/.ssh/authorized_keys"
 }
 
 # Create a git user on the system with home directory and
@@ -55,7 +56,7 @@ fcmd_init_gituser() {
   mkdir -p "$git_home/.ssh"
   touch "$git_home/.ssh/authorized_keys"
   chown -R "$git_user" "$git_home"
-  echo "Initializing git user complete"
+  echo "Created user '$git_user' with '$git_home' directory."
 }
 
 # Creates a sample receiver script.
@@ -70,7 +71,27 @@ fcmd_init_gitreceiverscript() {
 EOF
   chmod +x "$receiver_path"
   chown "$git_user" "$receiver_path"
-  echo "Initializing git receiver script complete"
+  echo "Created git receiver script '$receiver_path' for user '$git_user'."
+}
+
+cmd_create() {
+  declare name="$1"
+	declare repo_path="$ZGIT_HOME/$name"
+  if [ "$name" = "" ]; then
+    echo "Name required"
+    exit 1
+  fi
+  echo "Creating app '$1'"
+	if [ ! -d "$repo_path" ]; then
+    mkdir -p "$repo_path"
+    cd "$repo_path"
+    git init --bare
+    cd -
+    echo "Created app '$1' at '$repo_path'"
+	else
+    echo "Failed to create app. Directory exists at '$repo_path'"
+		exit 1
+  fi
 }
 
 subcommand=$1
