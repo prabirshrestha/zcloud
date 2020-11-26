@@ -92,7 +92,15 @@ EOF
 }
 
 cmd_git-post-receive() {
-  echo "git post receive"
+  echo "Powered by zcloud!"
+  declare repo_path=$(readlink -f $GIT_DIR)
+  declare name=$(basename "$repo_path")
+  echo "-----> Building $name ..."
+  echo "-----> Build complete!"
+
+  echo "-----> Deploying $name ..."
+  echo "-----> Application Deployed!"
+  echo
 }
 
 subcommand=$1
