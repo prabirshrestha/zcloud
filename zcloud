@@ -12,6 +12,7 @@ export ZSSH_AUTHORIZED_KEYES="$HOME/.ssh/authorized_keys"
 export ZROOT_DOMAIN="${ZROOT_DOMAIN:-}"
 export ZCA_SERVER="${ZCA_SERVER:-production}"
 export ZGIT_USER="${ZGIT_USER:-git}"
+export ZGIT_HOME="${ZGIT_HOME:-/home/$ZGIT_USER}"
 
 cmd_help() {
   echo "Usage: $ProgName <subcommand> [options]"
@@ -39,8 +40,16 @@ cmd_init() {
   fcmd_init_gituser
 }
 
+# Create a git user on the system with home directory and
+# an authorized_keys file that contains public keys for all users
+# that are allowed to push their repos here.
+# User defaults to $ZGIT_USER which defaults to 'git'.
 fcmd_init_gituser() {
   echo "Initializing git user"
+  useradd -d "$ZGIT_HOME" "$ZGIT_USER" || true
+  mkdir -p "$ZGIT_HOME/.ssh"
+  touch "$ZGIT_HOME/.ssh/authorized_keys"
+  chown -R "$ZGIT_USER" "$ZGIT_HOME"
 }
 
 subcommand=$1
