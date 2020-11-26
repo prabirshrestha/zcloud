@@ -16,27 +16,27 @@ export ZGIT_USER="${ZGIT_USER:-git}"
 cmd_help() {
   echo "Usage: $ProgName <subcommand> [options]"
   echo "Subcommands:"
-	echo "   install    Install prerequisites (requires sudo)"
+  echo "   install    Install prerequisites (requires sudo)"
   echo "   help       Show help"
 }
 
 cmd_install() {
-	set -e
+  set -e
   echo "Installing..."
 
   echo "Installing requried packages via $ZPKG_MANAGER"
 
-	if [ "$ZPKG_MANAGER" = "pacman" ]; then
-	  $ZSUDO "$ZPKG_MANAGER" -Syy
-	  $ZSUDO "$ZPKG_MANAGER" -S --noconfirm git docker
+  if [ "$ZPKG_MANAGER" = "pacman" ]; then
+    $ZSUDO "$ZPKG_MANAGER" -Syy
+    $ZSUDO "$ZPKG_MANAGER" -S --noconfirm git docker
   else
-	  $ZSUDO "$ZPKG_MANAGER" update -y -qq
-	  $ZSUDO "$ZPKG_MANAGER" install -y -qq git docker.io apt-transport-https
+    $ZSUDO "$ZPKG_MANAGER" update -y -qq
+    $ZSUDO "$ZPKG_MANAGER" install -y -qq git docker.io apt-transport-https
 	fi
 }
 
 cmd_init() {
-	fcmd_init_gituser
+  fcmd_init_gituser
 }
 
 fcmd_init_gituser() {
