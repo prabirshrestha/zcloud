@@ -39,6 +39,7 @@ cmd_install() {
 
 cmd_init() {
   fcmd_init_gituser "$ZGIT_HOME" "$ZGIT_USER"
+  fcmd_init_gitreceiverscript "$ZGIT_HOME" "$ZGIT_USER"
   echo
 	echo "Be sure to upload a public key for your user to $ZGIT_HOME/.ssh/authorized_keys"
 }
@@ -54,6 +55,22 @@ fcmd_init_gituser() {
   mkdir -p "$git_home/.ssh"
   touch "$git_home/.ssh/authorized_keys"
   chown -R "$git_user" "$git_home"
+  echo "Initializing git user complete"
+}
+
+# Creates a sample receiver script.
+# This is the script that is triggered after a successful push.
+fcmd_init_gitreceiverscript() {
+  echo "Initializing git receiver script"
+  declare git_home="$1" git_user="$2" || true
+  local receiver_path="$git_home/receiver"
+	cat > "$receiver_path" <<EOF
+#!/bin/bash
+
+EOF
+  chmod +x "$receiver_path"
+	chown "$git_user" "$receiver_path"
+  echo "Initializing git receiver script complete"
 }
 
 subcommand=$1
