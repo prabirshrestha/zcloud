@@ -1,5 +1,5 @@
 #!/bin/sh
-ProgName=$(basename $0)
+ZEXENAME=$(basename $0)
 
 if [ -f "/etc/arch-release" ]; then
   export ZPKG_MANAGER="pacman"
@@ -15,9 +15,10 @@ export ZGIT_USER="${ZGIT_USER:-git}"
 export ZGIT_HOME="${ZGIT_HOME:-/home/$ZGIT_USER}"
 
 cmd_help() {
-  echo "Usage: $ProgName <subcommand> [options]"
+  echo "Usage: $ZEXENAME <subcommand> [options]"
   echo "Subcommands:"
   echo "   install    Install prerequisites (requires sudo)"
+  echo "   init       Initializes server"
   echo "   help       Show help"
 }
 
@@ -62,7 +63,7 @@ case $subcommand in
   cmd_${subcommand} $@
   if [ $? = 127 ]; then
     echo "Error: $subcommand is not a known subcommand" >&2
-    echo "  Run '$ProgName --help'"
+    echo "  Run '$ZEXENAME --help'"
     exit 1
   fi
   ;;
