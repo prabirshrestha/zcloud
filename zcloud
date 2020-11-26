@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 ZEXENAME=$(basename $0)
 
 if [ -f "/etc/arch-release" ]; then
@@ -38,7 +38,9 @@ cmd_install() {
 }
 
 cmd_init() {
-  fcmd_init_gituser
+  fcmd_init_gituser "$ZGIT_HOME" "$ZGIT_USER"
+  echo
+	echo "Be sure to upload a public key for your user."
 }
 
 # Create a git user on the system with home directory and
@@ -47,10 +49,11 @@ cmd_init() {
 # User defaults to $ZGIT_USER which defaults to 'git'.
 fcmd_init_gituser() {
   echo "Initializing git user"
-  useradd -d "$ZGIT_HOME" "$ZGIT_USER" || true
-  mkdir -p "$ZGIT_HOME/.ssh"
-  touch "$ZGIT_HOME/.ssh/authorized_keys"
-  chown -R "$ZGIT_USER" "$ZGIT_HOME"
+  declare git_home="$1" git_user="$2" || true
+  useradd -d "$git_home" "$git_user" || true
+  mkdir -p "$git_home/.ssh"
+  touch "$git_home/.ssh/authorized_keys"
+  chown -R "$git_user" "$git_home"
 }
 
 subcommand=$1
