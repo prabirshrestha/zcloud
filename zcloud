@@ -1,0 +1,60 @@
+#!/bin/sh
+ProgName=$(basename $0)
+
+if [ -f "/etc/arch-release" ]; then
+  export ZPKG_MANAGER="pacman"
+else
+  export ZPKG_MANAGER="apt-get"
+fi
+export ZUSER="${ZUSER:-$USER}"
+export ZPASSWORD="${ZPASSWORD:-zpassword}"
+export ZSSH_AUTHORIZED_KEYES="$HOME/.ssh/authorized_keys"
+export ZROOT_DOMAIN="${ZROOT_DOMAIN:-}"
+export ZCA_SERVER="${ZCA_SERVER:-production}"
+export ZGIT_USER="${ZGIT_USER:-git}"
+
+cmd_help() {
+  echo "Usage: $ProgName <subcommand> [options]"
+  echo "Subcommands:"
+	echo "   install    Install prerequisites (requires sudo)"
+  echo "   help       Show help"
+}
+
+cmd_install() {
+	set -e
+  echo "Installing..."
+
+  echo "Installing requried packages via $ZPKG_MANAGER"
+
+	if [ "$ZPKG_MANAGER" = "pacman" ]; then
+	  $ZSUDO "$ZPKG_MANAGER" -Syy
+	  $ZSUDO "$ZPKG_MANAGER" -S --noconfirm git docker
+  else
+	  $ZSUDO "$ZPKG_MANAGER" update -y -qq
+	  $ZSUDO "$ZPKG_MANAGER" install -y -qq git docker.io apt-transport-https
+	fi
+}
+
+cmd_init() {
+	fcmd_init_gituser
+}
+
+fcmd_init_gituser() {
+  echo "Initializing git user"
+}
+
+subcommand=$1
+case $subcommand in
+  "" | "-h" | "--help")
+    cmd_help
+    ;;
+  *)
+  shift
+  cmd_${subcommand} $@
+  if [ $? = 127 ]; then
+    echo "Error: $subcommand is not a known subcommand" >&2
+    echo "  Run '$ProgName --help'"
+    exit 1
+  fi
+  ;;
+esac
