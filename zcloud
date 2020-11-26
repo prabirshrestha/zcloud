@@ -75,6 +75,7 @@ EOF
 }
 
 cmd_create() {
+  set -e
   declare name="$1"
   declare repo_path="$ZGIT_HOME/$name"
   if [ "$name" = "" ]; then
@@ -87,9 +88,9 @@ cmd_create() {
     cd "$repo_path"
     git init --bare
     cd -
-    echo "Created app '$1' at '$repo_path'"
-	else
-    echo "Failed to create app. Directory exists at '$repo_path'"
+    echo "Created app '$name' at '$repo_path'"
+  else
+    echo "Failed to create duplicate app '$name'"
     exit 1
   fi
 }
