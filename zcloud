@@ -64,12 +64,12 @@ fcmd_init_gitreceiverscript() {
   echo "Initializing git receiver script"
   declare git_home="$1" git_user="$2" || true
   local receiver_path="$git_home/receiver"
-	cat > "$receiver_path" <<EOF
+  cat > "$receiver_path" <<EOF
 #!/bin/bash
 
 EOF
   chmod +x "$receiver_path"
-	chown "$git_user" "$receiver_path"
+  chown "$git_user" "$receiver_path"
   echo "Initializing git receiver script complete"
 }
 
