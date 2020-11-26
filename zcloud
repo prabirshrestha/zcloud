@@ -83,7 +83,7 @@ cmd_create() {
     exit 1
   fi
   echo "Creating app '$1'"
-	if [ ! -d "$repo_path" ]; then
+  if [ ! -d "$repo_path" ]; then
     mkdir -p "$repo_path"
     cd "$repo_path"
     git init --bare
