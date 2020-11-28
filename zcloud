@@ -45,6 +45,7 @@ cmd_init() {
   fcmd_init_gituser "$ZGIT_HOME" "$ZGIT_USER"
   fcmd_init_docker_swarm
   fcmd_init_docker_network
+  fcmd_init_docker_traefik
   echo
   echo "Be sure to upload a public key for your user to $ZGIT_HOME/.ssh/authorized_keys"
 }
@@ -89,6 +90,10 @@ fcmd_init_docker_network() {
   else
     echo "Docker network ${network_name} already exists. Skipping."
   fi
+}
+
+fcmd_init_docker_network() {
+  docker stack deploy -c traefik.yml traefik
 }
 
 cmd_create() {
