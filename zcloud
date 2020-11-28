@@ -15,6 +15,7 @@ export ZCA_SERVER="${ZCA_SERVER:-production}"
 export ZGIT_USER="${ZGIT_USER:-git}"
 export ZGIT_HOME="${ZGIT_HOME:-/home/$ZGIT_USER}"
 export ZGIT_PATH="${ZGIT_PATH:-git}"
+export ZADDR="${ZADDR:-}"
 
 cmd_help() {
   echo "Usage: $ZEXENAME <subcommand> [options]"
@@ -42,7 +43,8 @@ cmd_install() {
 
 cmd_init() {
   fcmd_init_gituser "$ZGIT_HOME" "$ZGIT_USER"
-  fcmd_init_docker_network
+  fcmd_init_docker_swarm
+  #fcmd_init_docker_network
   echo
   echo "Be sure to upload a public key for your user to $ZGIT_HOME/.ssh/authorized_keys"
 }
@@ -61,6 +63,21 @@ fcmd_init_gituser() {
   chmod +x "$git_home/zcloud"
   chown -R "$git_user" "$git_home"
   echo "Created user '$git_user' with '$git_home' directory."
+}
+
+fcmd_init_docker_swarm() {
+  echo "Initializing docker swarm"
+  if [ "$(docker info --format '{{.Swarm.ControlAvailable}}')" = "false" ]; then
+    if [ "$ZADDR" = "" ]; then
+      echo "\$ZIP_ADDR requried to initialize swarm"
+      exit 1
+    else
+      docker swarm init --advertise-addr=${ZADDR}
+      echo "Docke swarm initialized."
+    fi
+  else
+    echo "Skipping docke swarm initialization."
+  fi
 }
 
 fcmd_init_docker_network() {
