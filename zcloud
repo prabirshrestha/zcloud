@@ -42,6 +42,7 @@ cmd_install() {
 
 cmd_init() {
   fcmd_init_gituser "$ZGIT_HOME" "$ZGIT_USER"
+  fcmd_init_docker
   echo
   echo "Be sure to upload a public key for your user to $ZGIT_HOME/.ssh/authorized_keys"
 }
@@ -60,6 +61,18 @@ fcmd_init_gituser() {
   chmod +x "$git_home/zcloud"
   chown -R "$git_user" "$git_home"
   echo "Created user '$git_user' with '$git_home' directory."
+}
+
+fcmd_init_docker() {
+
+  declare network_name="traefik-public"
+  echo "Creating docker network ${network_name}"
+  if [ -z $(docker network ls --filter name="^${network_name}$" --format="{{ .Name }}") ]; then
+    docker network create ${network_name}
+    echo "Docker network ${network_name} created."
+  else
+    echo "Docker network ${network_name} already exists. Skipping."
+  fi
 }
 
 cmd_create() {
@@ -84,7 +97,11 @@ set -eo pipefail;
 EOF
     chmod +x "$postreceive_path"
     chown -R "$ZGIT_USER" "$repo_path"
-    echo "Created app '$name' at '$repo_path'"
+    echo
+    echo "Created repository $name"
+    echo
+    echo "git remote add zcloud git@server:$name"
+    echo "git push zcloud master"
   else
     echo "Failed to create duplicate app '$name'"
     exit 1
