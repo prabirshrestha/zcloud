@@ -1,0 +1,15 @@
+version: '3'
+services:
+  helloworld:
+    image: tutum/hello-world:latest
+    networks:
+     - traefik-public
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.helloworld.rule=Host(`helloworld.zcloud.prabir.me`)"
+        - "traefik.http.routers.helloworld.entrypoints=web"
+        - "traefik.http.services.helloworld.loadbalancer.server.port=80"
+networks:
+  traefik-public:
+    external: true

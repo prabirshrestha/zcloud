@@ -38,6 +38,8 @@ cmd_install() {
   else
     $ZSUDO "$ZPKG_MANAGER" update -y -qq
     $ZSUDO "$ZPKG_MANAGER" install -y -qq git docker.io apt-transport-https
+    $ZSUDO systemctl start docker
+    $ZSUDO systemctl enable docker
   fi
 }
 
@@ -70,11 +72,11 @@ fcmd_init_docker_swarm() {
   echo "Initializing docker swarm"
   if [ "$(docker info --format '{{.Swarm.ControlAvailable}}')" = "false" ]; then
     if [ "$ZADDR" = "" ]; then
-      echo "\$ZIP_ADDR requried to initialize swarm"
+      echo "\$ZADDR requried to initialize swarm"
       exit 1
     else
       docker swarm init --advertise-addr=${ZADDR}
-      echo "Docke swarm initialized."
+      echo "Docker swarm initialized."
     fi
   else
     echo "Skipping docke swarm initialization."
@@ -92,7 +94,7 @@ fcmd_init_docker_network() {
   fi
 }
 
-fcmd_init_docker_network() {
+fcmd_init_docker_traefik() {
   docker stack deploy -c traefik.yml traefik
 }
 
