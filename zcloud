@@ -42,7 +42,7 @@ cmd_install() {
 
 cmd_init() {
   fcmd_init_gituser "$ZGIT_HOME" "$ZGIT_USER"
-  fcmd_init_docker
+  fcmd_init_docker_network
   echo
   echo "Be sure to upload a public key for your user to $ZGIT_HOME/.ssh/authorized_keys"
 }
@@ -63,8 +63,7 @@ fcmd_init_gituser() {
   echo "Created user '$git_user' with '$git_home' directory."
 }
 
-fcmd_init_docker() {
-
+fcmd_init_docker_network() {
   declare network_name="traefik-public"
   echo "Creating docker network ${network_name}"
   if [ -z $(docker network ls --filter name="^${network_name}$" --format="{{ .Name }}") ]; then
