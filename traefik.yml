@@ -9,9 +9,17 @@ services:
       - "--providers.docker.exposedbydefault=false"
       - "--providers.docker.network=traefik-public"
       - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencryptresolver.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencryptresolver.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencryptresolver.acme.email=mail@prabir.me"
+      - "--certificatesresolvers.letsencryptresolver.acme.storage=/letsencrypt/acme.json"
     ports:
       - 80:80
+      - 443:443
     volumes:
+      # To persist certificates
+      - traefik-certificates:/letsencrypt
       # So that Traefik can listen to the Docker events
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
@@ -20,7 +28,8 @@ services:
       placement:
         constraints:
           - node.role == manager
-
+volumes:
+  traefik-certificates:
 networks:
   traefik-public:
     external: true
