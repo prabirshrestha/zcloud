@@ -79,7 +79,7 @@ fcmd_init_docker_swarm() {
       echo "Docker swarm initialized."
     fi
   else
-    echo "Skipping docke swarm initialization."
+    echo "Skipping docker swarm initialization."
   fi
 }
 
