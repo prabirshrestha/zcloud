@@ -133,6 +133,17 @@ EOF
   fi
 }
 
+cmd_destroy() {
+  set -e
+  declare name="$1"
+  declare repo_src="$ZGIT_HOME/$name"
+  declare repo_dest="$ZGIT_HOME/.repo.$name"
+  docker stack rm "$name" || true
+  rm -rf "$repo_dest"
+  rm -rf "${repo_src}.old"
+  mv "$repo_src" "${repo_src}.old"
+}
+
 cmd_git-post-receive() {
   declare repo_src=$(readlink -f $GIT_DIR)
   declare name=$(basename "$repo_src")
