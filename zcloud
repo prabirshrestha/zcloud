@@ -65,6 +65,8 @@ fcmd_init_gituser() {
   cp "$ZSCRIPT_PATH" "$git_home"
   chmod +x "$git_home/zcloud"
   chown -R "$git_user" "$git_home"
+  groupadd docker || true
+  usermod -aG docker ${git_user}
   echo "Created user '$git_user' with '$git_home' directory."
 }
 
@@ -132,14 +134,35 @@ EOF
 }
 
 cmd_git-post-receive() {
-  echo "Powered by zcloud!"
-  declare repo_path=$(readlink -f $GIT_DIR)
-  declare name=$(basename "$repo_path")
+  declare repo_src=$(readlink -f $GIT_DIR)
+  declare name=$(basename "$repo_src")
+  declare repo_dest="$ZGIT_HOME/.repo.${name}"
+  declare branch=master
+
+  mkdir -p "$repo_dest"
+
+  while read oldrev newrev ref
+    do
+      # only checking out the master
+      if [ "$ref" = "refs/heads/$branch" ]; then
+        git --work-tree=$repo_dest --git-dir=$GIT_DIR checkout -f $branch
+        chown -R "$ZGIT_USER:$ZGIT_USER" "$repo_src" "$repo_dest"
+      else
+        echo "Ref $ref received. Doing nothing: only the ${branch} branch may be deployed on this server."
+	exit 0
+      fi
+  done
+
   echo "-----> Building $name ..."
   echo "-----> Build complete!"
 
   echo "-----> Deploying $name ..."
-  echo "-----> Application Deployed!"
+  if [ -f "$repo_dest/docker-compose.yml" ]; then
+    docker stack deploy -c "$repo_dest/docker-compose.yml" "$name"
+    echo "-----> Application Deployed!"
+  else
+    echo "-----> Ignoring deployment due to missing docker-compose.yml"
+  fi
   echo
 }
 
