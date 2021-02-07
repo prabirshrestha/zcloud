@@ -15,17 +15,19 @@ $ wget https://raw.githubusercontent.com/prabirshrestha/zcloud/master/zcloud
 $ chmod +x zcloud
 $ sudo ./zcloud install
 $ sudo ZADDR=1.1.1.1 ZCA_EMAIL=ca@email.com ./zcloud init
+$ rm ./zcloud           # use zcloud from /home/git/zcloud instead
 $ exit                  # exit from ssh server
 $ # copy ssh public key from local machine to server for git user
 $ cat ~/.ssh/id_rsa.pub | ssh user@server "sudo tee -a /home/git/.ssh/authorized_keys"
 ```
 
-## Deploy first app
+## Deploy your first app
 
 ### Create an empty git repo app on the server
 
 ```bash
 $ ssh user@server
+$ cd /home/git
 $ ./zcloud create helloworld
 $ exit
 ```
