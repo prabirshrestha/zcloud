@@ -207,6 +207,7 @@ cmd_git-post-receive() {
   done
 
   echo "-----> Building $name ..."
+  # TODO: use buildpack
   echo "-----> Build complete!"
 
   echo "-----> Deploying $name ..."
