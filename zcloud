@@ -7,11 +7,9 @@ if [ -f "/etc/arch-release" ]; then
 else
   export ZPKG_MANAGER="apt-get"
 fi
+
 export ZUSER="${ZUSER:-$USER}"
-export ZPASSWORD="${ZPASSWORD:-zpassword}"
 export ZSSH_AUTHORIZED_KEYES="$HOME/.ssh/authorized_keys"
-export ZROOT_DOMAIN="${ZROOT_DOMAIN:-}"
-export ZCA_SERVER="${ZCA_SERVER:-production}"
 export ZCA_EMAIL="${ZCA_EMIL:-}"
 export ZGIT_USER="${ZGIT_USER:-git}"
 export ZGIT_HOME="${ZGIT_HOME:-/home/$ZGIT_USER}"
@@ -75,7 +73,7 @@ fcmd_init_docker_swarm() {
   echo "Initializing docker swarm"
   if [ "$(docker info --format '{{.Swarm.ControlAvailable}}')" = "false" ]; then
     if [ "$ZADDR" = "" ]; then
-      echo "\$ZADDR requried to initialize swarm"
+      echo "\$ZADDR required to initialize swarm"
       exit 1
     else
       docker swarm init --advertise-addr=${ZADDR}
