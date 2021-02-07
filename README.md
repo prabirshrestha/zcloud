@@ -12,6 +12,13 @@ swarm.
 $ ssh user@server
 $ wget https://raw.githubusercontent.com/prabirshrestha/zcloud/master/zcloud
 $ chmod +x zcloud
+$ sudo ./zcloud install
+$ sudo ZADDR=1.1.1.1 ZCA_EMAIL=ca@email.com ./zcloud init
+```
+
+## help
+
+```bash
 $ ./zcloud help
 Usage: zcloud <subcommand> [options]
 Subcommands:
@@ -19,6 +26,4 @@ Subcommands:
    init           Initializes server (requires sudo)
    create <name>  Create empty app
    help           Show help
-$ sudo ./zcloud install
-$ sudo ZADDR=1.1.1.1 ZCA_EMAIL=ca@email.com ./zcloud init
 ```
