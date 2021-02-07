@@ -12,6 +12,7 @@ export ZPASSWORD="${ZPASSWORD:-zpassword}"
 export ZSSH_AUTHORIZED_KEYES="$HOME/.ssh/authorized_keys"
 export ZROOT_DOMAIN="${ZROOT_DOMAIN:-}"
 export ZCA_SERVER="${ZCA_SERVER:-production}"
+export ZCA_EMAIL="${ZCA_EMIL:-}"
 export ZGIT_USER="${ZGIT_USER:-git}"
 export ZGIT_HOME="${ZGIT_HOME:-/home/$ZGIT_USER}"
 export ZGIT_PATH="${ZGIT_PATH:-git}"
@@ -97,6 +98,47 @@ fcmd_init_docker_network() {
 }
 
 fcmd_init_docker_traefik() {
+  if [ ! -f traefik.yml ]; then
+    cat <<EOF >> traefik.yml
+version: '3'
+services:
+  reverse-proxy:
+    image: traefik:v2.3
+    command:
+      - "--providers.docker.endpoint=unix:///var/run/docker.sock"
+      - "--providers.docker.swarmMode=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=traefik-public"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencryptresolver.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencryptresolver.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencryptresolver.acme.email=${ZCA_EMAIL}"
+      - "--certificatesresolvers.letsencryptresolver.acme.storage=/letsencrypt/acme.json"
+      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      # To persist certificates
+      - traefik-certificates:/letsencrypt
+      # So that Traefik can listen to the Docker events
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - traefik-public
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+volumes:
+  traefik-certificates:
+networks:
+  traefik-public:
+    external: true
+EOF
+  fi
   docker stack deploy -c traefik.yml traefik
 }
 
@@ -192,3 +234,4 @@ case $subcommand in
   fi
   ;;
 esac
+# vim: set sw=2 ts=2 sts=2 et tw=78 foldmarker={{{,}}} foldmethod=marker spell:
