@@ -96,8 +96,9 @@ fcmd_init_docker_network() {
 }
 
 fcmd_init_docker_traefik() {
+  # TODO: convert this to git repo as just yet another app/stack
   if [ ! -f traefik.yml ]; then
-    cat <<EOF >> traefik.yml
+    cat <<EOF >> $ZGIT_HOME/traefik.yml
 version: '3'
 services:
   reverse-proxy:
@@ -136,8 +137,10 @@ networks:
   traefik-public:
     external: true
 EOF
+  else
+    cp traefik.yml "$ZGIT_HOME/traefik.yml"
   fi
-  docker stack deploy -c traefik.yml traefik
+  docker stack deploy -c "ZGIT_HOME/traefik.yml" traefik
 }
 
 cmd_create() {

@@ -23,11 +23,10 @@ $ cat ~/.ssh/id_rsa.pub | ssh user@server "sudo tee -a /home/git/.ssh/authorized
 
 ## Deploy your first app
 
-### Create an empty git repo app on the server
+### Create an empty app on the server
 
 ```bash
-$ ssh user@server
-$ cd /home/git
+$ ssh git@server
 $ ./zcloud create helloworld
 $ exit
 ```
