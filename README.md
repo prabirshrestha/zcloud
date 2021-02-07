@@ -33,6 +33,8 @@ $ exit
 
 ### add a docker-compose.yml file in the root of the git repo on the client
 
+Make sure to update the DNS records so the host is picked up correctly.
+
 ```docker
 version: '3'
 services:
