@@ -10,7 +10,7 @@ fi
 
 export ZUSER="${ZUSER:-$USER}"
 export ZSSH_AUTHORIZED_KEYES="$HOME/.ssh/authorized_keys"
-export ZCA_EMAIL="${ZCA_EMIAL:-}"
+export ZCA_EMAIL="${ZCA_EMAIL:-}"
 export ZGIT_USER="${ZGIT_USER:-git}"
 export ZGIT_HOME="${ZGIT_HOME:-/home/$ZGIT_USER}"
 export ZGIT_PATH="${ZGIT_PATH:-git}"
