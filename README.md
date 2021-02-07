@@ -45,7 +45,7 @@ services:
     deploy:
       labels:
         - "traefik.enable=true"
-        - "traefik.http.routers.helloworld.rule=Host(`hellworld.zcloud.com`)"
+        - "traefik.http.routers.helloworld.rule=Host(`helloworld.zcloud.com`)"
         - "traefik.http.routers.helloworld.entrypoints=websecure"
         - "traefik.http.routers.helloworld.tls=true"
         - "traefik.http.services.helloworld.loadbalancer.server.port=80"
