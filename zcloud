@@ -96,9 +96,16 @@ fcmd_init_docker_network() {
 }
 
 fcmd_init_docker_traefik() {
-  # TODO: convert this to git repo as just yet another app/stack
-  if [ ! -f traefik.yml ]; then
-    cat <<EOF >> $ZGIT_HOME/traefik.yml
+  declare name=router
+  declare repo_src="$ZGIT_HOME/$name"
+  declare repo_dest="$ZGIT_HOME/.repo.${name}"
+  declare branch=master
+  $ZGIT_HOME/zcloud create $name
+  mkdir -p "$repo_dest"
+  git --work-tree=$repo_dest --git-dir="$ZGIT_HOME/$name" checkout -f $branch
+  chown -R "$ZGIT_USER:$ZGIT_USER" "$repo_src" "$repo_dest"
+  if [ ! -f router.yml ]; then
+    cat <<EOF >> $repo_dest/docker-compose.yml
 version: '3'
 services:
   reverse-proxy:
@@ -138,9 +145,11 @@ networks:
     external: true
 EOF
   else
-    cp traefik.yml "$ZGIT_HOME/traefik.yml"
+    cp router.yml $repo_dest/docker-compose.yml
   fi
-  docker stack deploy -c "$ZGIT_HOME/traefik.yml" traefik
+  git --work-tree=$repo_dest --git-dir="$ZGIT_HOME/$name" add -A
+  git --work-tree=$repo_dest --git-dir="$ZGIT_HOME/$name" commit --author "zcloud" -m "initial commit"
+  git --work-tree=$repo_dest --git-dir="$ZGIT_HOME/$name" push -u origin master
 }
 
 cmd_create() {
