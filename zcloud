@@ -29,7 +29,7 @@ cmd_install() {
   set -e
   echo "Installing..."
 
-  echo "Installing requried packages via $ZPKG_MANAGER"
+  echo "Installing required packages via $ZPKG_MANAGER"
 
   if [ "$ZPKG_MANAGER" = "pacman" ]; then
     $ZSUDO "$ZPKG_MANAGER" -Syy
