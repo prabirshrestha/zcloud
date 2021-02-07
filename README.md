@@ -33,8 +33,7 @@ $ exit
 
 ### add a docker-compose.yml file in the root of the git repo on the client
 
-```bash
-$ cat <<EOF >> docker-compose.yml
+```docker
 version: '3'
 services:
   helloworld:
@@ -51,7 +50,6 @@ services:
 networks:
   traefik-public:
     external: true
-EOF
 ```
 
 ### add git remote and push
