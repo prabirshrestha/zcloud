@@ -85,3 +85,7 @@ Subcommands:
 
 - [ ] use [HashiCorp Waypoint](https://www.waypointproject.io/) to build and deploy.
 - [ ] add support for using nomad
+
+# Support Operating Systems
+
+* Ubuntu
