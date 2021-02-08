@@ -62,6 +62,11 @@ $ git remote add zcloud git@server:helloworld
 $ git push zcloud master
 ```
 
+## delete app
+
+* Login to server and remove the docker stack using `docker stack rm name`.
+* Delete `/home/git/appname` and `/home/git/.repo.appname` folders.
+
 # Commands
 
 ## help
