@@ -223,14 +223,16 @@ cmd_git-post-receive() {
       fi
   done
 
-  echo "-----> Building $name ..."
-  # TODO: use buildpack
-  echo "-----> Build complete!"
-
   echo "-----> Deploying $name ..."
   if [ -f "$repo_dest/waypoint.hcl" ]; then
+    cd "$repo_dest"
+    echo "-----> waypoint init $name ..."
     waypoint init
+    echo "-----> waypoint init $name complete!"
+    echo "-----> waypoint up $name ..."
     waypoint up
+    echo "-----> waypoint up $name complete!"
+    cd -
   elif [ -f "$repo_dest/docker-compose.yml" ]; then
     docker stack deploy -c "$repo_dest/docker-compose.yml" "$name"
     echo "-----> Application Deployed!"
