@@ -234,7 +234,7 @@ cmd_git-post-receive() {
     echo "-----> waypoint up $name complete!"
     cd -
   elif [ -f "$repo_dest/docker-compose.yml" ]; then
-    docker stack deploy -c "$repo_dest/docker-compose.yml" "$name"
+    docker stack deploy --prune -c "$repo_dest/docker-compose.yml" "$name"
     echo "-----> Application Deployed!"
   else
     echo "-----> Ignoring deployment due to missing waypoint.hcl and docker-compose.yml"
