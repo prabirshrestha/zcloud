@@ -36,12 +36,11 @@ cmd_install() {
     $ZSUDO "$ZPKG_MANAGER" -S --noconfirm git docker
   else
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | $ZSUDO apt-key add -
-    $ZSUDO add-apt-repository \
-"deb [arch=amd64] https://download.docker.com/linux/ubuntu \
-$(lsb_release -cs) \
-stable"
+    $ZSUDO add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+    curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
+    sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
     $ZSUDO "$ZPKG_MANAGER" update -y -qq
-    $ZSUDO "$ZPKG_MANAGER" install -y -qq git docker-ce docker-ce-cli containerd.io apt-transport-https
+    $ZSUDO "$ZPKG_MANAGER" install -y -qq git docker-ce docker-ce-cli containerd.io apt-transport-https waypoint
     $ZSUDO systemctl start docker
     $ZSUDO systemctl enable docker
   fi
