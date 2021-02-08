@@ -47,8 +47,9 @@ services:
         - "traefik.enable=true"
         - "traefik.http.routers.helloworld.rule=Host(`helloworld.zcloud.com`)"
         - "traefik.http.routers.helloworld.entrypoints=websecure"
-        - "traefik.http.routers.helloworld.tls=true"
+        - "traefik.http.routers.helloworld.tls.certresolver=letsencryptresolver"
         - "traefik.http.services.helloworld.loadbalancer.server.port=80"
+
 networks:
   traefik-public:
     external: true
