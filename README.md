@@ -80,3 +80,8 @@ Subcommands:
    create <name>  Create empty app
    help           Show help
 ```
+
+# Roadmap
+
+- [ ] use [HashiCorp Waypoint](https://www.waypointproject.io/) to build and deploy.
+- [ ] add support for using nomad
