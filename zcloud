@@ -99,10 +99,8 @@ fcmd_init_docker_traefik() {
   declare name=router
   declare repo_src="$ZGIT_HOME/$name"
   declare repo_dest="$ZGIT_HOME/.repo.${name}"
-  declare branch=master
   $ZGIT_HOME/zcloud create $name
-  mkdir -p "$repo_dest"
-  git --work-tree=$repo_dest --git-dir="$ZGIT_HOME/$name" checkout -f $branch
+  $ZGIT_PATH clone $repo_src $repo_dest
   chown -R "$ZGIT_USER:$ZGIT_USER" "$repo_src" "$repo_dest"
   if [ ! -f router.yml ]; then
     cat <<EOF >> $repo_dest/docker-compose.yml
@@ -147,9 +145,13 @@ EOF
   else
     cp router.yml $repo_dest/docker-compose.yml
   fi
-  git --work-tree=$repo_dest --git-dir="$ZGIT_HOME/$name" add -A
-  git --work-tree=$repo_dest --git-dir="$ZGIT_HOME/$name" commit --author "zcloud" -m "initial commit"
-  git --work-tree=$repo_dest --git-dir="$ZGIT_HOME/$name" push -u origin master
+  cd $repo_dest
+  $ZGIT_PATH config user.name zcloud
+  $ZGIT_PATH config user.email zcloud@zcloud.com
+  $ZGIT_PATH add .
+  $ZGIT_PATH commit -m "initial commit"
+  $ZGIT_PATH push origin master
+  cd -
 }
 
 cmd_create() {
