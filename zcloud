@@ -157,6 +157,7 @@ EOF
   $ZGIT_PATH commit -m "initial commit"
   $ZGIT_PATH push origin master
   cd -
+  rm -rf $repo_dest
 }
 
 cmd_create() {
