@@ -65,6 +65,7 @@ $ git push zcloud master
 ## delete app
 
 * Login to server and remove the docker stack using `docker stack rm name`.
+* If using `waypoint.hcl` go to the `/home/git/repo.appname` and run `waypoint destroy .`
 * Delete `/home/git/appname` and `/home/git/.repo.appname` folders.
 
 # Commands
