@@ -230,7 +230,7 @@ cmd_git-post-receive() {
     waypoint init
     echo "-----> waypoint init $name complete!"
     echo "-----> waypoint up $name ..."
-    waypoint up
+    waypoint up -plain
     echo "-----> waypoint up $name complete!"
     cd -
   elif [ -f "$repo_dest/docker-compose.yml" ]; then
