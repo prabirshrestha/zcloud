@@ -41,10 +41,12 @@ print_env() {
 consul_install() {
   if [ ! -f "$ZTMP/consul" ]; then
     if [ ! -f "$ZTMP/consul.zip" ]; then
+      echo "Downloading ${ZCONSUL_URL} to ${ZTMP/consul}"
       curl -Lo "$ZTMP/consul.zip" "$ZCONSUL_URL" 
     fi
     unzip -o "$ZTMP/consul.zip" -d "$ZTMP"
   fi
+  chmod 0755 "$ZTMP/consul"
 }
 
 create_tmp_dir
