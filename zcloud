@@ -22,17 +22,35 @@ if [ "$ZADDR" = "" ]; then
 fi
 export ZCONSUL_VERSION="${ZCONSUL_VERSION:-1.9.3}"
 export ZCONSUL_URL="${ZCONSUL_URL:-https://releases.hashicorp.com/consul/${ZCONSUL_VERSION}/consul_${ZCONSUL_VERSION}_${ZOS}_${ZARCH}.zip}"
-echo "ZCONSUL_URL: ${ZCONSUL_URL}"
+
+create_tmp_dir() {
+  mkdir -p "$ZTMP"
+}
+
+create_env() {
+  cat <<EOF > "$ZTMP/.env"
+export ZCONSUL_VERSION="$ZCONSUL_VERSION"
+export ZCONSUL_URL="$ZCONSUL_URL"
+EOF
+}
+
+print_env() {
+  cat "$ZTMP/.env"
+}
 
 consul_install() {
   if [ ! -f "$ZTMP/consul" ]; then
     if [ ! -f "$ZTMP/consul.zip" ]; then
-      curl --create-dirs -Lo "$ZTMP/consul.zip" "$ZCONSUL_URL" 
+      curl -Lo "$ZTMP/consul.zip" "$ZCONSUL_URL" 
     fi
     unzip -o "$ZTMP/consul.zip" -d "$ZTMP"
   fi
 }
 
+create_tmp_dir
+create_env
+print_env
+echo
 consul_install
 
 #export ZUSER="${ZUSER:-$USER}"
