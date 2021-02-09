@@ -2,259 +2,286 @@
 ZEXENAME=$(basename $0)
 ZSCRIPT_PATH=$(readlink -m $( type -p $0 ))
 
-if [ -f "/etc/arch-release" ]; then
-  export ZPKG_MANAGER="pacman"
-else
-  export ZPKG_MANAGER="apt-get"
-fi
-
-export ZUSER="${ZUSER:-$USER}"
-export ZSSH_AUTHORIZED_KEYES="$HOME/.ssh/authorized_keys"
-export ZCA_EMAIL="${ZCA_EMAIL:-}"
-export ZGIT_USER="${ZGIT_USER:-git}"
-export ZGIT_HOME="${ZGIT_HOME:-/home/$ZGIT_USER}"
-export ZGIT_PATH="${ZGIT_PATH:-git}"
-export ZADDR="${ZADDR:-}"
-
-cmd_help() {
-  echo "Usage: $ZEXENAME <subcommand> [options]"
-  echo "Subcommands:"
-  echo "   install        Install prerequisites (requires sudo)"
-  echo "   init           Initializes server (requires sudo)"
-  echo "   create <name>  Create empty app"
-  echo "   help           Show help"
-}
-
-cmd_install() {
-  set -e
-  echo "Installing..."
-
-  echo "Installing required packages via $ZPKG_MANAGER"
-
-  if [ "$ZPKG_MANAGER" = "pacman" ]; then
-    $ZSUDO "$ZPKG_MANAGER" -Syy
-    $ZSUDO "$ZPKG_MANAGER" -S --noconfirm git docker
-  else
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | $ZSUDO apt-key add -
-    $ZSUDO add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-    curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
-    sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
-    $ZSUDO "$ZPKG_MANAGER" update -y -qq
-    $ZSUDO "$ZPKG_MANAGER" install -y -qq git docker-ce docker-ce-cli containerd.io apt-transport-https waypoint
-    $ZSUDO systemctl start docker
-    $ZSUDO systemctl enable docker
-  fi
-}
-
-cmd_init() {
-  fcmd_init_gituser "$ZGIT_HOME" "$ZGIT_USER"
-  fcmd_init_docker_swarm
-  fcmd_init_docker_network
-  fcmd_init_docker_traefik
-  echo
-  echo "Be sure to upload a public key for your user to $ZGIT_HOME/.ssh/authorized_keys"
-}
-
-# Create a git user on the system with home directory and
-# an authorized_keys file that contains public keys for all users
-# that are allowed to push their repos here.
-# User defaults to $ZGIT_USER which defaults to 'git'.
-fcmd_init_gituser() {
-  echo "Initializing git user"
-  declare git_home="$1" git_user="$2" || true
-  useradd -d "$git_home" "$git_user" || true
-  mkdir -p "$git_home/.ssh"
-  touch "$git_home/.ssh/authorized_keys"
-  cp "$ZSCRIPT_PATH" "$git_home"
-  chmod +x "$git_home/zcloud"
-  chown -R "$git_user" "$git_home"
-  groupadd docker || true
-  usermod -aG docker ${git_user}
-  echo "Created user '$git_user' with '$git_home' directory."
-}
-
-fcmd_init_docker_swarm() {
-  echo "Initializing docker swarm"
-  if [ "$(docker info --format '{{.Swarm.ControlAvailable}}')" = "false" ]; then
-    if [ "$ZADDR" = "" ]; then
-      echo "\$ZADDR required to initialize swarm"
+export ZTMP=${ZTMP:-./tmp}
+export ZOS="${ZOS:-linux}"
+export ZARCH="${ZARCH:-}"
+if [ "$ZADDR" = "" ]; then
+  _arch=$(uname -m)
+  case "${_arch}" in
+    'x86_64')
+      export ZARCH="amd64"
+      ;;
+    'aarch64')
+      export ZARCH="arm64"
+      ;;
+    *)
+      echo "ERROR: unsupported architecture"
       exit 1
-    else
-      docker swarm init --advertise-addr=${ZADDR}
-      echo "Docker swarm initialized."
+      ;;
+  esac
+fi
+export ZCONSUL_VERSION="${ZCONSUL_VERSION:-1.9.3}"
+export ZCONSUL_URL="${ZCONSUL_URL:-https://releases.hashicorp.com/consul/${ZCONSUL_VERSION}/consul_${ZCONSUL_VERSION}_${ZOS}_${ZARCH}.zip}"
+echo "ZCONSUL_URL: ${ZCONSUL_URL}"
+
+consul_install() {
+  if [ ! -f "$ZTMP/consul" ]; then
+    if [ ! -f "$ZTMP/consul.zip" ]; then
+      curl --create-dirs -Lo "$ZTMP/consul.zip" "$ZCONSUL_URL" 
     fi
-  else
-    echo "Skipping docker swarm initialization."
+    unzip -o "$ZTMP/consul.zip" -d "$ZTMP"
   fi
 }
 
-fcmd_init_docker_network() {
-  declare network_name="traefik-public"
-  echo "Creating docker network ${network_name}"
-  if [ -z $(docker network ls --filter name="^${network_name}$" --format="{{ .Name }}") ]; then
-    docker network create --driver=overlay ${network_name}
-    echo "Docker network ${network_name} created."
-  else
-    echo "Docker network ${network_name} already exists. Skipping."
-  fi
-}
+consul_install
 
-fcmd_init_docker_traefik() {
-  declare name=router
-  declare repo_src="$ZGIT_HOME/$name"
-  declare repo_dest="$ZGIT_HOME/.repo.${name}"
-  $ZGIT_HOME/zcloud create $name
-  $ZGIT_PATH clone $repo_src $repo_dest
-  chown -R "$ZGIT_USER:$ZGIT_USER" "$repo_src" "$repo_dest"
-  if [ ! -f router.yml ]; then
-    cat <<EOF >> $repo_dest/docker-compose.yml
-version: '3'
-services:
-  reverse-proxy:
-    image: traefik:v2.4
-    command:
-      - "--providers.docker.endpoint=unix:///var/run/docker.sock"
-      - "--providers.docker.swarmMode=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=traefik-public"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.letsencryptresolver.acme.httpchallenge=true"
-      - "--certificatesresolvers.letsencryptresolver.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.letsencryptresolver.acme.email=${ZCA_EMAIL}"
-      - "--certificatesresolvers.letsencryptresolver.acme.storage=/letsencrypt/acme.json"
-      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
-      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
-    ports:
-      - 80:80
-      - 443:443
-    volumes:
-      # To persist certificates
-      - traefik-certificates:/letsencrypt
-      # So that Traefik can listen to the Docker events
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks:
-      - traefik-public
-    deploy:
-      placement:
-        constraints:
-          - node.role == manager
-volumes:
-  traefik-certificates:
-networks:
-  traefik-public:
-    external: true
-EOF
-  else
-    cp router.yml $repo_dest/docker-compose.yml
-  fi
-  cd $repo_dest
-  $ZGIT_PATH config user.name zcloud
-  $ZGIT_PATH config user.email zcloud@zcloud.com
-  $ZGIT_PATH add .
-  $ZGIT_PATH commit -m "initial commit"
-  $ZGIT_PATH push origin master
-  cd -
-  rm -rf $repo_dest
-}
+#export ZUSER="${ZUSER:-$USER}"
+#export ZSSH_AUTHORIZED_KEYES="$HOME/.ssh/authorized_keys"
+#export ZCA_EMAIL="${ZCA_EMAIL:-}"
+#export ZGIT_USER="${ZGIT_USER:-git}"
+#export ZGIT_HOME="${ZGIT_HOME:-/home/$ZGIT_USER}"
+#export ZGIT_PATH="${ZGIT_PATH:-git}"
+#export ZADDR="${ZADDR:-}"
 
-cmd_create() {
-  set -e
-  declare name="$1"
-  declare repo_path="$ZGIT_HOME/$name"
-  if [ "$name" = "" ]; then
-    echo "Name required"
-    exit 1
-  fi
-  echo "Creating app '$1'"
-  if [ ! -d "$repo_path" ]; then
-    mkdir -p "$repo_path"
-    cd "$repo_path"
-    "$ZGIT_PATH" init --bare
-    cd -
-    local postreceive_path="$repo_path/hooks/post-receive"
-    cat > "$postreceive_path" <<EOF
-#!/usr/bin/env bash
-set -eo pipefail;
-"\$PWD/../zcloud" git-post-receive
-EOF
-    chmod +x "$postreceive_path"
-    chown -R "$ZGIT_USER" "$repo_path"
-    echo
-    echo "Created repository $name"
-    echo
-    echo "git remote add zcloud git@server:$name"
-    echo "git push zcloud master"
-  else
-    echo "Failed to create duplicate app '$name'"
-    exit 1
-  fi
-}
+#cmd_help() {
+#  echo "Usage: $ZEXENAME <subcommand> [options]"
+#  echo "Subcommands:"
+#  echo "   install        Install prerequisites (requires sudo)"
+#  echo "   init           Initializes server (requires sudo)"
+#  echo "   create <name>  Create empty app"
+#  echo "   help           Show help"
+#}
 
-cmd_destroy() {
-  set -e
-  declare name="$1"
-  declare repo_src="$ZGIT_HOME/$name"
-  declare repo_dest="$ZGIT_HOME/.repo.$name"
-  docker stack rm "$name" || true
-  rm -rf "$repo_dest"
-  rm -rf "${repo_src}.old"
-  mv "$repo_src" "${repo_src}.old"
-}
+#cmd_install() {
+#  set -e
+#  echo "Installing..."
 
-cmd_git-post-receive() {
-  declare repo_src=$(readlink -f $GIT_DIR)
-  declare name=$(basename "$repo_src")
-  declare repo_dest="$ZGIT_HOME/.repo.${name}"
-  declare branch=master
+#  echo "Installing required packages via $ZPKG_MANAGER"
 
-  mkdir -p "$repo_dest"
+#  if [ "$ZPKG_MANAGER" = "pacman" ]; then
+#    $ZSUDO "$ZPKG_MANAGER" -Syy
+#    $ZSUDO "$ZPKG_MANAGER" -S --noconfirm git docker
+#  else
+#    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | $ZSUDO apt-key add -
+#    $ZSUDO add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+#    curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
+#    sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+#    $ZSUDO "$ZPKG_MANAGER" update -y -qq
+#    $ZSUDO "$ZPKG_MANAGER" install -y -qq git docker-ce docker-ce-cli containerd.io apt-transport-https waypoint
+#    $ZSUDO systemctl start docker
+#    $ZSUDO systemctl enable docker
+#  fi
+#}
 
-  while read oldrev newrev ref
-    do
-      # only checking out the master
-      if [ "$ref" = "refs/heads/$branch" ]; then
-        git --work-tree=$repo_dest --git-dir=$GIT_DIR checkout -f $branch
-        chown -R "$ZGIT_USER:$ZGIT_USER" "$repo_src" "$repo_dest"
-      else
-        echo "Ref $ref received. Doing nothing: only the ${branch} branch may be deployed on this server."
-	exit 0
-      fi
-  done
+#cmd_init() {
+#  fcmd_init_gituser "$ZGIT_HOME" "$ZGIT_USER"
+#  fcmd_init_docker_swarm
+#  fcmd_init_docker_network
+#  fcmd_init_docker_traefik
+#  echo
+#  echo "Be sure to upload a public key for your user to $ZGIT_HOME/.ssh/authorized_keys"
+#}
 
-  echo "-----> Deploying $name ..."
-  if [ -f "$repo_dest/waypoint.hcl" ]; then
-    cd "$repo_dest"
-    echo "-----> waypoint init $name ..."
-    waypoint init
-    echo "-----> waypoint init $name complete!"
-    echo "-----> waypoint up $name ..."
-    waypoint up -plain
-    echo "-----> waypoint up $name complete!"
-    cd -
-  elif [ -f "$repo_dest/docker-compose.yml" ]; then
-    docker stack deploy --prune -c "$repo_dest/docker-compose.yml" "$name"
-    echo "-----> Application Deployed!"
-  else
-    echo "-----> Ignoring deployment due to missing waypoint.hcl and docker-compose.yml"
-  fi
-  echo
-}
+## Create a git user on the system with home directory and
+## an authorized_keys file that contains public keys for all users
+## that are allowed to push their repos here.
+## User defaults to $ZGIT_USER which defaults to 'git'.
+#fcmd_init_gituser() {
+#  echo "Initializing git user"
+#  declare git_home="$1" git_user="$2" || true
+#  useradd -d "$git_home" "$git_user" || true
+#  mkdir -p "$git_home/.ssh"
+#  touch "$git_home/.ssh/authorized_keys"
+#  cp "$ZSCRIPT_PATH" "$git_home"
+#  chmod +x "$git_home/zcloud"
+#  chown -R "$git_user" "$git_home"
+#  groupadd docker || true
+#  usermod -aG docker ${git_user}
+#  echo "Created user '$git_user' with '$git_home' directory."
+#}
 
-subcommand=$1
-case $subcommand in
-  "" | "-h" | "--help")
-    cmd_help
-    ;;
-  *)
-  shift
-  cmd_${subcommand} $@
-  if [ $? = 127 ]; then
-    echo "Error: $subcommand is not a known subcommand" >&2
-    echo "  Run '$ZEXENAME --help'"
-    exit 1
-  fi
-  ;;
-esac
-# vim: set sw=2 ts=2 sts=2 et tw=78 foldmarker={{{,}}} foldmethod=marker spell:
+#fcmd_init_docker_swarm() {
+#  echo "Initializing docker swarm"
+#  if [ "$(docker info --format '{{.Swarm.ControlAvailable}}')" = "false" ]; then
+#    if [ "$ZADDR" = "" ]; then
+#      echo "\$ZADDR required to initialize swarm"
+#      exit 1
+#    else
+#      docker swarm init --advertise-addr=${ZADDR}
+#      echo "Docker swarm initialized."
+#    fi
+#  else
+#    echo "Skipping docker swarm initialization."
+#  fi
+#}
+
+#fcmd_init_docker_network() {
+#  declare network_name="traefik-public"
+#  echo "Creating docker network ${network_name}"
+#  if [ -z $(docker network ls --filter name="^${network_name}$" --format="{{ .Name }}") ]; then
+#    docker network create --driver=overlay ${network_name}
+#    echo "Docker network ${network_name} created."
+#  else
+#    echo "Docker network ${network_name} already exists. Skipping."
+#  fi
+#}
+
+#fcmd_init_docker_traefik() {
+#  declare name=router
+#  declare repo_src="$ZGIT_HOME/$name"
+#  declare repo_dest="$ZGIT_HOME/.repo.${name}"
+#  $ZGIT_HOME/zcloud create $name
+#  $ZGIT_PATH clone $repo_src $repo_dest
+#  chown -R "$ZGIT_USER:$ZGIT_USER" "$repo_src" "$repo_dest"
+#  if [ ! -f router.yml ]; then
+#    cat <<EOF >> $repo_dest/docker-compose.yml
+#version: '3'
+#services:
+#  reverse-proxy:
+#    image: traefik:v2.4
+#    command:
+#      - "--providers.docker.endpoint=unix:///var/run/docker.sock"
+#      - "--providers.docker.swarmMode=true"
+#      - "--providers.docker.exposedbydefault=false"
+#      - "--providers.docker.network=traefik-public"
+#      - "--entrypoints.web.address=:80"
+#      - "--entrypoints.websecure.address=:443"
+#      - "--certificatesresolvers.letsencryptresolver.acme.httpchallenge=true"
+#      - "--certificatesresolvers.letsencryptresolver.acme.httpchallenge.entrypoint=web"
+#      - "--certificatesresolvers.letsencryptresolver.acme.email=${ZCA_EMAIL}"
+#      - "--certificatesresolvers.letsencryptresolver.acme.storage=/letsencrypt/acme.json"
+#      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
+#      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
+#      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
+#    ports:
+#      - 80:80
+#      - 443:443
+#    volumes:
+#      # To persist certificates
+#      - traefik-certificates:/letsencrypt
+#      # So that Traefik can listen to the Docker events
+#      - /var/run/docker.sock:/var/run/docker.sock:ro
+#    networks:
+#      - traefik-public
+#    deploy:
+#      placement:
+#        constraints:
+#          - node.role == manager
+#volumes:
+#  traefik-certificates:
+#networks:
+#  traefik-public:
+#    external: true
+#EOF
+#  else
+#    cp router.yml $repo_dest/docker-compose.yml
+#  fi
+#  cd $repo_dest
+#  $ZGIT_PATH config user.name zcloud
+#  $ZGIT_PATH config user.email zcloud@zcloud.com
+#  $ZGIT_PATH add .
+#  $ZGIT_PATH commit -m "initial commit"
+#  $ZGIT_PATH push origin master
+#  cd -
+#  rm -rf $repo_dest
+#}
+
+#cmd_create() {
+#  set -e
+#  declare name="$1"
+#  declare repo_path="$ZGIT_HOME/$name"
+#  if [ "$name" = "" ]; then
+#    echo "Name required"
+#    exit 1
+#  fi
+#  echo "Creating app '$1'"
+#  if [ ! -d "$repo_path" ]; then
+#    mkdir -p "$repo_path"
+#    cd "$repo_path"
+#    "$ZGIT_PATH" init --bare
+#    cd -
+#    local postreceive_path="$repo_path/hooks/post-receive"
+#    cat > "$postreceive_path" <<EOF
+##!/usr/bin/env bash
+#set -eo pipefail;
+#"\$PWD/../zcloud" git-post-receive
+#EOF
+#    chmod +x "$postreceive_path"
+#    chown -R "$ZGIT_USER" "$repo_path"
+#    echo
+#    echo "Created repository $name"
+#    echo
+#    echo "git remote add zcloud git@server:$name"
+#    echo "git push zcloud master"
+#  else
+#    echo "Failed to create duplicate app '$name'"
+#    exit 1
+#  fi
+#}
+
+#cmd_destroy() {
+#  set -e
+#  declare name="$1"
+#  declare repo_src="$ZGIT_HOME/$name"
+#  declare repo_dest="$ZGIT_HOME/.repo.$name"
+#  docker stack rm "$name" || true
+#  rm -rf "$repo_dest"
+#  rm -rf "${repo_src}.old"
+#  mv "$repo_src" "${repo_src}.old"
+#}
+
+#cmd_git-post-receive() {
+#  declare repo_src=$(readlink -f $GIT_DIR)
+#  declare name=$(basename "$repo_src")
+#  declare repo_dest="$ZGIT_HOME/.repo.${name}"
+#  declare branch=master
+
+#  mkdir -p "$repo_dest"
+
+#  while read oldrev newrev ref
+#    do
+#      # only checking out the master
+#      if [ "$ref" = "refs/heads/$branch" ]; then
+#        git --work-tree=$repo_dest --git-dir=$GIT_DIR checkout -f $branch
+#        chown -R "$ZGIT_USER:$ZGIT_USER" "$repo_src" "$repo_dest"
+#      else
+#        echo "Ref $ref received. Doing nothing: only the ${branch} branch may be deployed on this server."
+#	exit 0
+#      fi
+#  done
+
+#  echo "-----> Deploying $name ..."
+#  if [ -f "$repo_dest/waypoint.hcl" ]; then
+#    cd "$repo_dest"
+#    echo "-----> waypoint init $name ..."
+#    waypoint init
+#    echo "-----> waypoint init $name complete!"
+#    echo "-----> waypoint up $name ..."
+#    waypoint up -plain
+#    echo "-----> waypoint up $name complete!"
+#    cd -
+#  elif [ -f "$repo_dest/docker-compose.yml" ]; then
+#    docker stack deploy --prune -c "$repo_dest/docker-compose.yml" "$name"
+#    echo "-----> Application Deployed!"
+#  else
+#    echo "-----> Ignoring deployment due to missing waypoint.hcl and docker-compose.yml"
+#  fi
+#  echo
+#}
+
+#subcommand=$1
+#case $subcommand in
+#  "" | "-h" | "--help")
+#    cmd_help
+#    ;;
+#  *)
+#  shift
+#  cmd_${subcommand} $@
+#  if [ $? = 127 ]; then
+#    echo "Error: $subcommand is not a known subcommand" >&2
+#    echo "  Run '$ZEXENAME --help'"
+#    exit 1
+#  fi
+#  ;;
+#esac
+## vim: set sw=2 ts=2 sts=2 et tw=78 foldmarker={{{,}}} foldmethod=marker spell:
