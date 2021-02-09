@@ -1,34 +1,36 @@
 #!/usr/bin/env bash
+set -e
+
 ZEXENAME=$(basename $0)
 ZSCRIPT_PATH=$(readlink -m $( type -p $0 ))
 
-export ZTMP=${ZTMP:-./tmp}
-export ZOS="${ZOS:-linux}"
-export ZARCH="${ZARCH:-}"
-if [ "$ZADDR" = "" ]; then
-  _arch=$(uname -m)
-  case "${_arch}" in
-    'x86_64')
-      export ZARCH="amd64"
-      ;;
-    'aarch64')
-      export ZARCH="arm64"
-      ;;
-    *)
-      echo "ERROR: unsupported architecture"
-      exit 1
-      ;;
-  esac
-fi
-export ZCONSUL_VERSION="${ZCONSUL_VERSION:-1.9.3}"
-export ZCONSUL_URL="${ZCONSUL_URL:-https://releases.hashicorp.com/consul/${ZCONSUL_VERSION}/consul_${ZCONSUL_VERSION}_${ZOS}_${ZARCH}.zip}"
-
-create_tmp_dir() {
-  mkdir -p "$ZTMP"
+setup_env() {
+  export ZTMP=${ZTMP:-./tmp}
+  export ZDEST="${ZDEST:-/usr/local/bin}"
+  export ZOS="${ZOS:-linux}"
+  export ZARCH="${ZARCH:-}"
+  if [ "$ZADDR" = "" ]; then
+    _arch=$(uname -m)
+    case "${_arch}" in
+      'x86_64')
+        export ZARCH="amd64"
+        ;;
+      'aarch64')
+        export ZARCH="arm64"
+        ;;
+      *)
+        echo "ERROR: unsupported architecture"
+        exit 1
+        ;;
+    esac
+  fi
+  export ZCONSUL_VERSION="${ZCONSUL_VERSION:-1.9.3}"
+  export ZCONSUL_URL="${ZCONSUL_URL:-https://releases.hashicorp.com/consul/${ZCONSUL_VERSION}/consul_${ZCONSUL_VERSION}_${ZOS}_${ZARCH}.zip}"
 }
 
 create_env() {
   cat <<EOF > "$ZTMP/.env"
+export ZDEST="$ZDEST"
 export ZCONSUL_VERSION="$ZCONSUL_VERSION"
 export ZCONSUL_URL="$ZCONSUL_URL"
 EOF
@@ -38,7 +40,11 @@ print_env() {
   cat "$ZTMP/.env"
 }
 
-consul_install() {
+create_tmp_dir() {
+  mkdir -p "$ZTMP"
+}
+
+consul_download() {
   if [ ! -f "$ZTMP/consul" ]; then
     if [ ! -f "$ZTMP/consul.zip" ]; then
       echo "Downloading ${ZCONSUL_URL} to ${ZTMP/consul}"
@@ -49,10 +55,17 @@ consul_install() {
   chmod 0755 "$ZTMP/consul"
 }
 
+consul_install() {
+  cp "$ZTMP/consul" "$ZDEST/consul"
+  "$ZDEST/consul" --version
+}
+
+setup_env
 create_tmp_dir
 create_env
 print_env
 echo
+consul_download
 consul_install
 
 #export ZUSER="${ZUSER:-$USER}"
