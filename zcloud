@@ -5,6 +5,8 @@ ZEXENAME=$(basename $0)
 ZSCRIPT_PATH=$(readlink -m $( type -p $0 ))
 
 setup_env() {
+  export ZSERVER_IP="${ZSERVER_IP:-127.0.0.1}"
+
   export ZTMP=${ZTMP:-./tmp}
   export ZDEST="${ZDEST:-/usr/local/bin}"
   export ZOS="${ZOS:-linux}"
@@ -26,6 +28,9 @@ setup_env() {
   fi
   export ZCONSUL_VERSION="${ZCONSUL_VERSION:-1.9.3}"
   export ZCONSUL_URL="${ZCONSUL_URL:-https://releases.hashicorp.com/consul/${ZCONSUL_VERSION}/consul_${ZCONSUL_VERSION}_${ZOS}_${ZARCH}.zip}"
+  export ZCONSUL_CONFIG_DIR="${ZCONSUL_CONFIG_DIR:-/consul/config}"
+  export ZCONSUL_GROUP="${ZCONSUL_GROUP:-consul}"
+  export ZCONSUL_USER="${ZCONSUL_USER:-consul}"
 }
 
 create_env() {
@@ -33,6 +38,8 @@ create_env() {
 export ZDEST="$ZDEST"
 export ZCONSUL_VERSION="$ZCONSUL_VERSION"
 export ZCONSUL_URL="$ZCONSUL_URL"
+export ZCONSUL_GROUP=$ZCONSUL_GROUP
+export ZCONSUL_USER=$ZCONSUL_USER
 EOF
 }
 
@@ -55,9 +62,54 @@ consul_download() {
   chmod 0755 "$ZTMP/consul"
 }
 
+consul_create_systemd_file() {
+  if [ -f consul.service ]; then
+    cp consul.service "$ZTMP/consul.service"
+  else
+    cat <<EOF > "$ZTMP/consul.service"
+[Unit]
+Description=consul
+Documentation=https://consul.io/docs/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=consul
+Group=consul
+LimitNOFILE=1024
+ExecStart=/usr/local/bin/consul agent -server -bind='${ZSERVER_IP}' -advertise='${ZSERVER_IP}' -bootstrap-expect=1 -data-dir=/var/lib/consul -config-dir=/etc/consul.d
+ExecReload=/bin/kill -HUP $MAINPID
+KillSignal=SIGINT
+TimeoutStopSec=5
+Restart=on-failure
+SyslogIdentifier=consul
+[Install]
+WantedBy=multi-user.target
+EOF
+  fi
+}
+
+consul_create_group_and_user() {
+  groupadd --system --force $ZCONSUL_GROUP
+  id $ZCONSUL_USER >& /dev/null || useradd -s /sbin/nologin --system -g $ZCONSUL_GROUP $ZCONSUL_USER
+}
+
 consul_install() {
-  cp "$ZTMP/consul" "$ZDEST/consul"
-  "$ZDEST/consul" --version
+  # consule_uninstall &> /dev/null
+  mkdir -p /var/lib/consul /etc/consul.d
+  chown -R $ZCONSUL_USER:$ZCONSUL_USER /var/lib/consul /etc/consul.d
+  chmod -R 775 /var/lib/consul /etc/consul.d
+  cp "$ZTMP/consul" "/usr/local/bin/consul"
+  cp "$ZTMP/consul.service" "/etc/systemd/system/consul.service"
+  systemctl daemon-reload
+  systemctl start consul
+  systemctl enable consul
+  systemctl status consul --no-pager
+}
+
+consule_uninstall() {
+  service=consul; systemctl stop $service && systemctl disable $service && rm /etc/systemd/system/$service && systemctl daemon-reload && systemctl reset-failed
 }
 
 setup_env
@@ -66,6 +118,8 @@ create_env
 print_env
 echo
 consul_download
+consul_create_systemd_file
+consul_create_group_and_user
 consul_install
 
 #export ZUSER="${ZUSER:-$USER}"
