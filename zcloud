@@ -31,6 +31,7 @@ setup_env() {
   export ZCONSUL_CONFIG_DIR="${ZCONSUL_CONFIG_DIR:-/consul/config}"
   export ZCONSUL_GROUP="${ZCONSUL_GROUP:-consul}"
   export ZCONSUL_USER="${ZCONSUL_USER:-consul}"
+  export ZCONSUL_ENCRYPT="${ZCONSUL_ENCRYPT:-}"
 }
 
 create_env() {
@@ -62,6 +63,25 @@ consul_download() {
   chmod 0755 "$ZTMP/consul"
 }
 
+consul_create_config() {
+  if [ -f consul.config.json ]; then
+    cp consul.config.json "$ZTMP/consul.config.json"
+  else
+    cat <<EOF > "$ZTMP/consul.config.json"
+{
+  "advertise_addr": "$ZSERVER_IP",
+  "bind_addr": "$ZSERVER_IP",
+  "bootstrap_expect": 1,
+  "datacenter": "dc1",
+  "data_dir": "/var/lib/consul",
+  "encrypt": "${ZCONSUL_ENCRYPT}",
+  "log_level": "ERR",
+  "ui": false
+}
+EOF
+  fi
+}
+
 consul_create_systemd_file() {
   if [ -f consul.service ]; then
     cp consul.service "$ZTMP/consul.service"
@@ -78,7 +98,7 @@ Type=simple
 User=consul
 Group=consul
 LimitNOFILE=1024
-ExecStart=/usr/local/bin/consul agent -server -bind='${ZSERVER_IP}' -advertise='${ZSERVER_IP}' -bootstrap-expect=1 -data-dir=/var/lib/consul -config-dir=/etc/consul.d
+ExecStart=/usr/local/bin/consul agent -server -config-dir=/etc/consul.d
 ExecReload=/bin/kill -HUP $MAINPID
 KillSignal=SIGINT
 TimeoutStopSec=5
@@ -98,6 +118,7 @@ consul_create_group_and_user() {
 consul_install() {
   # consule_uninstall &> /dev/null
   mkdir -p /var/lib/consul /etc/consul.d
+  cp "$ZTMP/consul.config.json" /etc/consul.d/config.json
   chown -R $ZCONSUL_USER:$ZCONSUL_USER /var/lib/consul /etc/consul.d
   chmod -R 775 /var/lib/consul /etc/consul.d
   cp "$ZTMP/consul" "/usr/local/bin/consul"
@@ -118,6 +139,7 @@ create_env
 print_env
 echo
 consul_download
+consul_create_config
 consul_create_systemd_file
 consul_create_group_and_user
 consul_install
