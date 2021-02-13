@@ -185,13 +185,13 @@ Wants=network-online.target
 [Service]
 Type=simple
 LimitNOFILE=1024
-ExecStart=/usr/local/bin/nomad agent -config-dir=/etc/nomad.d
+ExecStart=/usr/local/bin/nomad agent -config=/etc/nomad.d
 ExecReload=/bin/kill -HUP $MAINPID
 KillSignal=SIGINT
 TimeoutStopSec=5
 Restart=on-failure
 SyslogIdentifier=nomad
-TaskMax=infinity
+TasksMax=infinity
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -200,6 +200,19 @@ EOF
 
 nomad_stop() {
   systemctl stop nomad || true
+}
+
+nomad_install() {
+  # nomad_uninstall &> /dev/null
+  mkdir -p /var/lib/nomad /etc/nomad.d
+  cp "$ZTMP/nomad.hcl" /etc/nomad.d/nomad.hcl
+  chmod -R 775 /var/lib/nomad /etc/nomad.d
+  cp "$ZTMP/nomad" "/usr/local/bin/nomad"
+  cp "$ZTMP/nomad.service" "/etc/systemd/system/nomad.service"
+  systemctl daemon-reload
+  systemctl start nomad
+  systemctl enable nomad
+  systemctl status nomad --no-pager
 }
 
 setup_env
@@ -217,6 +230,7 @@ nomad_download
 nomad_create_config
 nomad_create_systemd_file
 nomad_stop
+nomad_install
 
 #export ZUSER="${ZUSER:-$USER}"
 #export ZSSH_AUTHORIZED_KEYES="$HOME/.ssh/authorized_keys"
