@@ -4,6 +4,12 @@ set -e
 ZEXENAME=$(basename $0)
 ZSCRIPT_PATH=$(readlink -m $( type -p $0 ))
 
+if [ -f "/etc/arch-release" ]; then
+  export ZPKG_MANAGER="pacman"
+else
+  export ZPKG_MANAGER="apt-get"
+fi
+
 setup_env() {
   export ZSERVER_IP="${ZSERVER_IP:-127.0.0.1}"
   export ZDATACENTER="dc1"
@@ -54,6 +60,24 @@ print_env() {
 
 create_tmp_dir() {
   mkdir -p "$ZTMP"
+}
+
+docker_install() {
+  if [ "$ZPKG_MANAGER" = "pacman" ]; then
+    $ZSUDO "$ZPKG_MANAGER" -Syy
+    $ZSUDO "$ZPKG_MANAGER" -S --noconfirm git docker
+    systemctl start docker
+    systemctl enable docker
+  else
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | $ZSUDO apt-key add -
+    add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+    curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
+    sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+    "$ZPKG_MANAGER" update -y -qq
+    "$ZPKG_MANAGER" install -y -qq git docker-ce docker-ce-cli containerd.io apt-transport-https
+    systemctl start docker
+    systemctl enable docker
+  fi
 }
 
 consul_download() {
@@ -229,6 +253,7 @@ create_tmp_dir
 create_env
 print_env
 echo
+docker_install
 consul_download
 consul_create_config
 consul_create_systemd_file
