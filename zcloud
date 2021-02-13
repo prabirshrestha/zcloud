@@ -142,6 +142,10 @@ consul_uninstall() {
   service=consul; systemctl stop $service && systemctl disable $service && rm /etc/systemd/system/$service && systemctl daemon-reload && systemctl reset-failed
 }
 
+consul_status() {
+  consul members
+}
+
 nomad_download() {
   if [ ! -f "$ZTMP/nomad" ]; then
     if [ ! -f "$ZTMP/nomad.zip" ]; then
@@ -215,6 +219,11 @@ nomad_install() {
   systemctl status nomad --no-pager
 }
 
+nomad_status() {
+  nomad server members
+  nomad node status -verbose
+}
+
 setup_env
 create_tmp_dir
 create_env
@@ -231,6 +240,8 @@ nomad_create_config
 nomad_create_systemd_file
 nomad_stop
 nomad_install
+# consul_status
+# nomad_status
 
 #export ZUSER="${ZUSER:-$USER}"
 #export ZSSH_AUTHORIZED_KEYES="$HOME/.ssh/authorized_keys"
