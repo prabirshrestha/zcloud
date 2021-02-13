@@ -76,6 +76,7 @@ consul_create_config() {
   "data_dir": "/var/lib/consul",
   "encrypt": "${ZCONSUL_ENCRYPT}",
   "log_level": "ERR",
+  "server": true,
   "ui": false
 }
 EOF
@@ -98,7 +99,7 @@ Type=simple
 User=consul
 Group=consul
 LimitNOFILE=1024
-ExecStart=/usr/local/bin/consul agent -server -config-dir=/etc/consul.d
+ExecStart=/usr/local/bin/consul agent -config-dir=/etc/consul.d
 ExecReload=/bin/kill -HUP $MAINPID
 KillSignal=SIGINT
 TimeoutStopSec=5
@@ -113,6 +114,10 @@ EOF
 consul_create_group_and_user() {
   groupadd --system --force $ZCONSUL_GROUP
   id $ZCONSUL_USER >& /dev/null || useradd -s /sbin/nologin --system -g $ZCONSUL_GROUP $ZCONSUL_USER
+}
+
+consul_stop() {
+  systemctl stop consul || true
 }
 
 consul_install() {
@@ -142,6 +147,7 @@ consul_download
 consul_create_config
 consul_create_systemd_file
 consul_create_group_and_user
+consul_stop
 consul_install
 
 #export ZUSER="${ZUSER:-$USER}"
