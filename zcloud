@@ -6,6 +6,7 @@ ZSCRIPT_PATH=$(readlink -m $( type -p $0 ))
 
 setup_env() {
   export ZSERVER_IP="${ZSERVER_IP:-127.0.0.1}"
+  export ZDATACENTER="dc1"
 
   export ZTMP=${ZTMP:-./tmp}
   export ZDEST="${ZDEST:-/usr/local/bin}"
@@ -75,7 +76,7 @@ consul_create_config() {
   "advertise_addr": "$ZSERVER_IP",
   "bind_addr": "$ZSERVER_IP",
   "bootstrap_expect": 1,
-  "datacenter": "dc1",
+  "datacenter": "${ZDATACENTER}",
   "data_dir": "/var/lib/consul",
   "encrypt": "${ZCONSUL_ENCRYPT}",
   "log_level": "ERR",
@@ -152,6 +153,24 @@ nomad_download() {
   chmod 0755 "$ZTMP/nomad"
 }
 
+nomad_create_config() {
+  if [ -f nomad.hcl ]; then
+    cp nomad.hcl "$ZTMP/nomad.hcl"
+  else
+    cat <<EOF > "$ZTMP/nomad.hcl"
+datacenter="${ZDATACENTER}"
+data_dir="/var/lib/nomad"
+server {
+  enabled = true
+  bootstrap_expect = 1
+}
+client {
+  enabled = true
+}
+EOF
+  fi
+}
+
 setup_env
 create_tmp_dir
 create_env
@@ -164,6 +183,7 @@ consul_create_group_and_user
 consul_stop
 consul_install
 nomad_download
+nomad_create_config
 
 #export ZUSER="${ZUSER:-$USER}"
 #export ZSSH_AUTHORIZED_KEYES="$HOME/.ssh/authorized_keys"
