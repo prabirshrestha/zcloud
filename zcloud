@@ -198,6 +198,10 @@ EOF
   fi
 }
 
+nomad_stop() {
+  systemctl stop nomad || true
+}
+
 setup_env
 create_tmp_dir
 create_env
@@ -212,6 +216,7 @@ consul_install
 nomad_download
 nomad_create_config
 nomad_create_systemd_file
+nomad_stop
 
 #export ZUSER="${ZUSER:-$USER}"
 #export ZSSH_AUTHORIZED_KEYES="$HOME/.ssh/authorized_keys"
