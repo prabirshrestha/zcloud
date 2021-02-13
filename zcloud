@@ -121,7 +121,7 @@ consul_stop() {
 }
 
 consul_install() {
-  # consule_uninstall &> /dev/null
+  # consul_uninstall &> /dev/null
   mkdir -p /var/lib/consul /etc/consul.d
   cp "$ZTMP/consul.config.json" /etc/consul.d/config.json
   chown -R $ZCONSUL_USER:$ZCONSUL_USER /var/lib/consul /etc/consul.d
@@ -134,7 +134,7 @@ consul_install() {
   systemctl status consul --no-pager
 }
 
-consule_uninstall() {
+consul_uninstall() {
   service=consul; systemctl stop $service && systemctl disable $service && rm /etc/systemd/system/$service && systemctl daemon-reload && systemctl reset-failed
 }
 
