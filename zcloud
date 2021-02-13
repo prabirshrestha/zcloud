@@ -171,6 +171,33 @@ EOF
   fi
 }
 
+nomad_create_systemd_file() {
+  if [ -f nomad.service ]; then
+    cp nomad.service "$ZTMP/nomad.service"
+  else
+    cat <<EOF > "$ZTMP/nomad.service"
+[Unit]
+Description=nomad
+Documentation=https://www.nomadproject.io/docs
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+LimitNOFILE=1024
+ExecStart=/usr/local/bin/nomad agent -config-dir=/etc/nomad.d
+ExecReload=/bin/kill -HUP $MAINPID
+KillSignal=SIGINT
+TimeoutStopSec=5
+Restart=on-failure
+SyslogIdentifier=nomad
+TaskMax=infinity
+[Install]
+WantedBy=multi-user.target
+EOF
+  fi
+}
+
 setup_env
 create_tmp_dir
 create_env
@@ -184,6 +211,7 @@ consul_stop
 consul_install
 nomad_download
 nomad_create_config
+nomad_create_systemd_file
 
 #export ZUSER="${ZUSER:-$USER}"
 #export ZSSH_AUTHORIZED_KEYES="$HOME/.ssh/authorized_keys"
