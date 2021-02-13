@@ -248,26 +248,6 @@ nomad_status() {
   nomad node status -verbose
 }
 
-setup_env
-create_tmp_dir
-create_env
-print_env
-echo
-docker_install
-consul_download
-consul_create_config
-consul_create_systemd_file
-consul_create_group_and_user
-consul_stop
-consul_install
-nomad_download
-nomad_create_config
-nomad_create_systemd_file
-nomad_stop
-nomad_install
-# consul_status
-# nomad_status
-
 #export ZUSER="${ZUSER:-$USER}"
 #export ZSSH_AUTHORIZED_KEYES="$HOME/.ssh/authorized_keys"
 #export ZCA_EMAIL="${ZCA_EMAIL:-}"
@@ -276,14 +256,14 @@ nomad_install
 #export ZGIT_PATH="${ZGIT_PATH:-git}"
 #export ZADDR="${ZADDR:-}"
 
-#cmd_help() {
-#  echo "Usage: $ZEXENAME <subcommand> [options]"
-#  echo "Subcommands:"
-#  echo "   install        Install prerequisites (requires sudo)"
-#  echo "   init           Initializes server (requires sudo)"
-#  echo "   create <name>  Create empty app"
-#  echo "   help           Show help"
-#}
+cmd_help() {
+  echo "Usage: $ZEXENAME <subcommand> [options]"
+  echo "Subcommands:"
+  echo "   init             Initializes server (requires sudo)"
+  echo "   create  <name>   Create an empty app"
+  echo "   destroy <name>   Destroy an app"
+  echo "   help             Show help"
+}
 
 #cmd_install() {
 #  set -e
@@ -306,14 +286,33 @@ nomad_install
 #  fi
 #}
 
-#cmd_init() {
+cmd_init() {
+  setup_env
+  create_tmp_dir
+  create_env
+  print_env
+  echo
+  docker_install
+  consul_download
+  consul_create_config
+  consul_create_systemd_file
+  consul_create_group_and_user
+  consul_stop
+  consul_install
+  nomad_download
+  nomad_create_config
+  nomad_create_systemd_file
+  nomad_stop
+  nomad_install
+# consul_status
+# nomad_status
 #  fcmd_init_gituser "$ZGIT_HOME" "$ZGIT_USER"
 #  fcmd_init_docker_swarm
 #  fcmd_init_docker_network
 #  fcmd_init_docker_traefik
 #  echo
 #  echo "Be sure to upload a public key for your user to $ZGIT_HOME/.ssh/authorized_keys"
-#}
+}
 
 ## Create a git user on the system with home directory and
 ## an authorized_keys file that contains public keys for all users
@@ -502,19 +501,19 @@ nomad_install
 #  echo
 #}
 
-#subcommand=$1https://releases.hashicorp.com/nomad/1.0.3/nomad_1.0.3_linux_amd64.zip
-#case $subcommand in
-#  "" | "-h" | "--help")
-#    cmd_help
-#    ;;
-#  *)
-#  shift
-#  cmd_${subcommand} $@
-#  if [ $? = 127 ]; then
-#    echo "Error: $subcommand is not a known subcommand" >&2
-#    echo "  Run '$ZEXENAME --help'"
-#    exit 1
-#  fi
-#  ;;
-#esac
+subcommand=$1
+case $subcommand in
+  "" | "-h" | "--help")
+    cmd_help
+    ;;
+  *)
+  shift
+  cmd_${subcommand} $@
+  if [ $? = 127 ]; then
+    echo "Error: $subcommand is not a known subcommand" >&2
+    echo "  Run '$ZEXENAME --help'"
+    exit 1
+  fi
+  ;;
+esac
 ## vim: set sw=2 ts=2 sts=2 et tw=78 foldmarker={{{,}}} foldmethod=marker spell:
