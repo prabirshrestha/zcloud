@@ -32,6 +32,9 @@ setup_env() {
   export ZCONSUL_GROUP="${ZCONSUL_GROUP:-consul}"
   export ZCONSUL_USER="${ZCONSUL_USER:-consul}"
   export ZCONSUL_ENCRYPT="${ZCONSUL_ENCRYPT:-}"
+
+  export ZNOMAD_VERSION="${ZNOMAD_VERSION:-1.0.3}"
+  export ZNOMAD_URL="${ZNOMAD_URL:-https://releases.hashicorp.com/nomad/${ZNOMAD_VERSION}/nomad_${ZNOMAD_VERSION}_${ZOS}_${ZARCH}.zip}"
 }
 
 create_env() {
@@ -138,6 +141,17 @@ consul_uninstall() {
   service=consul; systemctl stop $service && systemctl disable $service && rm /etc/systemd/system/$service && systemctl daemon-reload && systemctl reset-failed
 }
 
+nomad_download() {
+  if [ ! -f "$ZTMP/nomad" ]; then
+    if [ ! -f "$ZTMP/nomad.zip" ]; then
+      echo "Downloading ${ZNOMAD_URL} to ${ZTMP/nomad}"
+      curl -Lo "$ZTMP/nomad.zip" "$ZNOMAD_URL"
+    fi
+    unzip -o "$ZTMP/nomad.zip" -d "$ZTMP"
+  fi
+  chmod 0755 "$ZTMP/nomad"
+}
+
 setup_env
 create_tmp_dir
 create_env
@@ -149,6 +163,7 @@ consul_create_systemd_file
 consul_create_group_and_user
 consul_stop
 consul_install
+nomad_download
 
 #export ZUSER="${ZUSER:-$USER}"
 #export ZSSH_AUTHORIZED_KEYES="$HOME/.ssh/authorized_keys"
@@ -384,7 +399,7 @@ consul_install
 #  echo
 #}
 
-#subcommand=$1
+#subcommand=$1https://releases.hashicorp.com/nomad/1.0.3/nomad_1.0.3_linux_amd64.zip
 #case $subcommand in
 #  "" | "-h" | "--help")
 #    cmd_help
