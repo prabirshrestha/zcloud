@@ -262,6 +262,10 @@ waypoint_download() {
   chmod 0755 "$ZTMP/waypoint"
 }
 
+waypoint_install() {
+  cp "$ZTMP/waypoint" "/usr/local/bin/waypoint"
+}
+
 #export ZUSER="${ZUSER:-$USER}"
 #export ZSSH_AUTHORIZED_KEYES="$HOME/.ssh/authorized_keys"
 #export ZCA_EMAIL="${ZCA_EMAIL:-}"
@@ -319,6 +323,7 @@ cmd_init() {
   nomad_stop
   nomad_install
   waypoint_download
+  waypoint_install
 # consul_status
 # nomad_status
 #  fcmd_init_gituser "$ZGIT_HOME" "$ZGIT_USER"
