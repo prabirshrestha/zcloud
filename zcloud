@@ -12,7 +12,8 @@ fi
 
 setup_env() {
   export ZSERVER_IP="${ZSERVER_IP:-127.0.0.1}"
-  export ZDATACENTER="dc1"
+  export ZREGION="${ZREGION:-global}"
+  export ZDATACENTER="${ZDATACENTER:-dc1}"
 
   export ZTMP=${ZTMP:-./tmp}
   export ZDEST="${ZDEST:-/usr/local/bin}"
@@ -43,14 +44,17 @@ setup_env() {
   export ZNOMAD_VERSION="${ZNOMAD_VERSION:-1.0.3}"
   export ZNOMAD_URL="${ZNOMAD_URL:-https://releases.hashicorp.com/nomad/${ZNOMAD_VERSION}/nomad_${ZNOMAD_VERSION}_${ZOS}_${ZARCH}.zip}"
 
-  export ZWAYPOINT_VERSION="0.2.2"
+  export ZWAYPOINT_VERSION="${ZWAYPOINT_VERSION:-0.2.2}"
   export ZWAYPOINT_URL="${ZWAYPOINT_URL:-https://releases.hashicorp.com/waypoint/${ZWAYPOINT_VERSION}/waypoint_${ZWAYPOINT_VERSION}_linux_${ZARCH}.zip}"
+
+  export ZTRAEFIK_VERSION="${ZTRAEFIK_VERSION:-2.4}"
 }
 
 create_env() {
   cat <<EOF > "$ZTMP/.env"
 export ZDEST="$ZDEST"
 export ZSERVER_IP="${ZSERVER_IP}"
+export ZREGION="${ZREGION}"
 export ZDATACENTER="${ZDATACENTER}"
 export ZCONSUL_VERSION="$ZCONSUL_VERSION"
 export ZCONSUL_URL="$ZCONSUL_URL"
@@ -272,6 +276,83 @@ waypoint_install() {
   cp "$ZTMP/waypoint" "/usr/local/bin/waypoint"
 }
 
+traefik_create_nomad_job_file() {
+  if [ -f traefik.nomad ]; then
+    cp traefik.nomad "$ZTMP/traefik.nomad"
+  else
+    cat <<EOFNOMAD > "$ZTMP/traefik.nomad"
+job "traefik" {
+    region = "$ZREGION"
+    datacenters = [$ZDATACENTER]
+    type = "service"
+
+    group "traefik" {
+        count = 1
+
+        network {
+            port "http" {
+                static = 8080
+            }
+
+            port "api" {
+                static = 8081
+            }
+        }
+
+        service {
+            name = "traefik"
+
+            check {
+                name = "alive"
+                type = "tcp"
+                port = "http"
+                interval = "10s"
+                timeout = "2s"
+            }
+        }
+
+        task "traefik" {
+            driver = "docker"
+
+            config {
+                image = "traefik:v${ZTRAEFIK_VERSION}"
+                network_mode = "host"
+
+                volumes = [
+                    "local/traefik.toml:/etc/traefik/traefik.toml"
+                ]
+            }
+
+            template {
+                destination = "local/traefik.toml"
+                data = <<EOF
+[entryPoints]
+    [entryPoints.htp]
+    address = ":8080"
+    [entryPoints.traefik]
+    address = ":8081"
+
+[api]
+    dashboard = true
+    insecure = true
+
+[providers.consulCatalog.endpoint]
+    address = "$ZSERVER_IP:8500"
+    scheme = "http"
+EOF
+            }
+
+            resources {
+                cpu     = 100
+                memory  = 128
+            }
+        }
+    }
+}
+EOFNOMAD
+  fi
+}
+
 #export ZUSER="${ZUSER:-$USER}"
 #export ZSSH_AUTHORIZED_KEYES="$HOME/.ssh/authorized_keys"
 #export ZCA_EMAIL="${ZCA_EMAIL:-}"
@@ -330,6 +411,7 @@ cmd_init() {
   nomad_install
   waypoint_download
   waypoint_install
+  traefik_create_nomad_job_file
 # consul_status
 # nomad_status
 #  fcmd_init_gituser "$ZGIT_HOME" "$ZGIT_USER"
