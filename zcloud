@@ -42,6 +42,9 @@ setup_env() {
 
   export ZNOMAD_VERSION="${ZNOMAD_VERSION:-1.0.3}"
   export ZNOMAD_URL="${ZNOMAD_URL:-https://releases.hashicorp.com/nomad/${ZNOMAD_VERSION}/nomad_${ZNOMAD_VERSION}_${ZOS}_${ZARCH}.zip}"
+
+  export ZWAYPOINT_VERSION="0.2.2"
+  export ZWAYPOINT_URL="${ZWAYPOINT_URL:-https://releases.hashicorp.com/waypoint/${ZWAYPOINT_VERSION}/waypoint_${ZWAYPOINT_VERSION}_linux_${ZARCH}.zip}"
 }
 
 create_env() {
@@ -83,7 +86,7 @@ docker_install() {
 consul_download() {
   if [ ! -f "$ZTMP/consul" ]; then
     if [ ! -f "$ZTMP/consul.zip" ]; then
-      echo "Downloading ${ZCONSUL_URL} to ${ZTMP/consul}"
+      echo "Downloading ${ZCONSUL_URL} to ${ZTMP/consul.zip}"
       curl -Lo "$ZTMP/consul.zip" "$ZCONSUL_URL" 
     fi
     unzip -o "$ZTMP/consul.zip" -d "$ZTMP"
@@ -173,7 +176,7 @@ consul_status() {
 nomad_download() {
   if [ ! -f "$ZTMP/nomad" ]; then
     if [ ! -f "$ZTMP/nomad.zip" ]; then
-      echo "Downloading ${ZNOMAD_URL} to ${ZTMP/nomad}"
+      echo "Downloading ${ZNOMAD_URL} to ${ZTMP/nomad.zip}"
       curl -Lo "$ZTMP/nomad.zip" "$ZNOMAD_URL"
     fi
     unzip -o "$ZTMP/nomad.zip" -d "$ZTMP"
@@ -248,6 +251,17 @@ nomad_status() {
   nomad node status -verbose
 }
 
+waypoint_download() {
+  if [ ! -f "$ZTMP/waypoint" ]; then
+    if [ ! -f "$ZTMP/waypoint.zip" ]; then
+      echo "Downloading ${ZWAYPOINT_URL} to ${ZTMP/waypoint.zip}"
+      curl -Lo "$ZTMP/waypoint.zip" "$ZWAYPOINT_URL"
+    fi
+    unzip -o "$ZTMP/waypoint.zip" -d "$ZTMP"
+  fi
+  chmod 0755 "$ZTMP/waypoint"
+}
+
 #export ZUSER="${ZUSER:-$USER}"
 #export ZSSH_AUTHORIZED_KEYES="$HOME/.ssh/authorized_keys"
 #export ZCA_EMAIL="${ZCA_EMAIL:-}"
@@ -304,6 +318,7 @@ cmd_init() {
   nomad_create_systemd_file
   nomad_stop
   nomad_install
+  waypoint_download
 # consul_status
 # nomad_status
 #  fcmd_init_gituser "$ZGIT_HOME" "$ZGIT_USER"
