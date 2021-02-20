@@ -14,6 +14,7 @@ setup_env() {
   export ZSERVER_IP="${ZSERVER_IP:-127.0.0.1}"
   export ZREGION="${ZREGION:-global}"
   export ZDATACENTER="${ZDATACENTER:-dc1}"
+  export ZFIREWALL="${ZFIREWALL:-1}"
 
   export ZTMP=${ZTMP:-./tmp}
   export ZDEST="${ZDEST:-/usr/local/bin}"
@@ -75,10 +76,10 @@ create_tmp_dir() {
   mkdir -p "$ZTMP"
 }
 
-docker_install() {
+pkgs_install() {
   if [ "$ZPKG_MANAGER" = "pacman" ]; then
     $ZSUDO "$ZPKG_MANAGER" -Syy
-    $ZSUDO "$ZPKG_MANAGER" -S --noconfirm git docker
+    $ZSUDO "$ZPKG_MANAGER" -S --noconfirm git docker ufw
     systemctl start docker
     systemctl enable docker
   else
@@ -87,9 +88,25 @@ docker_install() {
     curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
     sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
     "$ZPKG_MANAGER" update -y -qq
-    "$ZPKG_MANAGER" install -y -qq git docker-ce docker-ce-cli containerd.io apt-transport-https
+    "$ZPKG_MANAGER" install -y -qq git docker-ce docker-ce-cli containerd.io apt-transport-https ufw
     systemctl start docker
     systemctl enable docker
+  fi
+}
+
+firewall_setup() {
+  if [ "$ZFIREWALL" == "1" ]; then
+    echo "Setting up firewall"
+    ufw status verbose
+    ufw default allow outgoing
+    ufw default deny incoming
+    ufw limit ssh
+    ufw allow http
+    ufw allow https
+    ufw enable
+    ufw status verbose
+    systemctl start ufw
+    systemctl enable ufw
   fi
 }
 
@@ -397,7 +414,8 @@ cmd_init() {
   create_env
   print_env
   echo
-  docker_install
+  pkgs_install
+  firewall_setup
   consul_download
   consul_create_config
   consul_create_systemd_file
