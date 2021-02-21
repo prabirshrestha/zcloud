@@ -3,6 +3,12 @@ set -e
 
 ZEXENAME=$(basename $0)
 ZSCRIPT_PATH=$(readlink -m $( type -p $0 ))
+PRG="$0"
+# need this for relative symlinks
+while [ -h "$PRG" ] ; do
+   PRG=`readlink "$PRG"`
+done
+scriptdir=`dirname "$PRG"`
 
 if [ -f "/etc/arch-release" ]; then
   export ZPKG_MANAGER="pacman"
@@ -391,6 +397,7 @@ git_create_user() {
   cp "$ZSCRIPT_PATH" "$ZHOME/zcloud"
   cp "$ZTMP/.env" "$ZHOME/.env"
   chmod +x "$ZHOME/zcloud"
+  mkdir -p "$ZHOME/apps"
   chown -R "$ZUSER" "$ZHOME"
   groupadd --system --force docker
   usermod -aG docker "$ZUSER"
@@ -456,8 +463,9 @@ cmd_init() {
   nomad_install
   waypoint_download
   waypoint_install
-  publicproxy_create_nomad_job_file
   git_create_user
+  "$ZHOME/zcloud" create publicproxy
+  publicproxy_create_nomad_job_file
 # consul_status
 # nomad_status
 #  fcmd_init_gituser "$ZGIT_HOME" "$ZGIT_USER"
@@ -554,38 +562,45 @@ cmd_init() {
 #  rm -rf $repo_dest
 #}
 
-#cmd_create() {
-#  set -e
-#  declare name="$1"
-#  declare repo_path="$ZGIT_HOME/$name"
-#  if [ "$name" = "" ]; then
-#    echo "Name required"
-#    exit 1
-#  fi
-#  echo "Creating app '$1'"
-#  if [ ! -d "$repo_path" ]; then
-#    mkdir -p "$repo_path"
-#    cd "$repo_path"
-#    "$ZGIT_PATH" init --bare
-#    cd -
-#    local postreceive_path="$repo_path/hooks/post-receive"
-#    cat > "$postreceive_path" <<EOF
-##!/usr/bin/env bash
-#set -eo pipefail;
-#"\$PWD/../zcloud" git-post-receive
-#EOF
-#    chmod +x "$postreceive_path"
-#    chown -R "$ZGIT_USER" "$repo_path"
-#    echo
-#    echo "Created repository $name"
-#    echo
-#    echo "git remote add zcloud git@server:$name"
-#    echo "git push zcloud master"
-#  else
-#    echo "Failed to create duplicate app '$name'"
-#    exit 1
-#  fi
-#}
+load_zcloud_env() {
+  echo "$scriptdir"
+  if [ -f "$scriptdir/.env" ]; then
+    source "$scriptdir/.env"
+  fi
+}
+
+cmd_create() {
+  set -e
+  load_zcloud_env
+  declare name="$1"
+  declare barerepo="$ZHOME/apps/$name"
+  if [ "$name" = "" ]; then
+    echo "Name required"
+    exit 1
+  fi
+  if [ -d "$barerepo" ]; then
+    echo "Failed to create duplicate app '$name'"
+    exit 1
+  fi
+  echo "Creating app '$1' at '$barerepo'."
+  mkdir -p "$barerepo"
+  cd "$barerepo"
+  git init --bare
+  cd -
+  local postreceive_path="$barerepo/hooks/post-receive"
+  cat > "$postreceive_path" <<EOF
+#!/usr/bin/env bash
+set -eo pipefail;
+"\$PWD/../../zcloud" git-post-receive
+EOF
+  chmod +x "$postreceive_path"
+  chown -R "$ZUSER" "$barerepo"
+  echo
+  echo "Created repository $name"
+  echo
+  echo "git remote add zcloud zcloud@server:apps/$name"
+  echo "git push zcloud master"
+}
 
 #cmd_destroy() {
 #  set -e
