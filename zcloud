@@ -49,10 +49,15 @@ setup_env() {
   export ZWAYPOINT_URL="${ZWAYPOINT_URL:-https://releases.hashicorp.com/waypoint/${ZWAYPOINT_VERSION}/waypoint_${ZWAYPOINT_VERSION}_linux_${ZARCH}.zip}"
 
   export ZTRAEFIK_VERSION="${ZTRAEFIK_VERSION:-2.4}"
+
+  export ZHOME="${ZHOME:-/home/zcloud}"
+  export ZUSER="${ZUSER:-zcloud}"
 }
 
 create_env() {
   cat <<EOF > "$ZTMP/.env"
+export ZHOME="$ZHOME"
+export ZUSER="$ZUSER"
 export ZDEST="$ZDEST"
 export ZSERVER_IP="${ZSERVER_IP}"
 export ZREGION="${ZREGION}"
@@ -370,6 +375,28 @@ EOFNOMAD
   fi
 }
 
+## Create a git user on the system with home directory and
+## an authorized_keys file that contains public keys for all users
+## that are allowed to push their repos here.
+## User defaults to $ZGIT_USER which defaults to 'git'.
+git_create_user() {
+  echo "Initializing git user"
+  id $ZUSER >& /dev/null || useradd -d "$ZHOME" "$ZUSER"
+  mkdir -p "$ZHOME/.ssh"
+  if [ -f "authorized_keys" ]; then
+    cp "authorized_keys" "$ZHOME/.ssh/authorized_keys"
+  else
+    touch "$ZHOME/.ssh/authorized_keys"
+  fi
+  cp "$ZSCRIPT_PATH" "$ZHOME/zcloud"
+  cp "$ZTMP/.env" "$ZHOME/.env"
+  chmod +x "$ZHOME/zcloud"
+  chown -R "$ZUSER" "$ZHOME"
+  groupadd --system --force docker
+  usermod -aG docker "$ZUSER"
+  echo "Created user '$ZUSER' with '$ZHOME' directory."
+}
+
 #export ZUSER="${ZUSER:-$USER}"
 #export ZSSH_AUTHORIZED_KEYES="$HOME/.ssh/authorized_keys"
 #export ZCA_EMAIL="${ZCA_EMAIL:-}"
@@ -430,6 +457,7 @@ cmd_init() {
   waypoint_download
   waypoint_install
   publicproxy_create_nomad_job_file
+  git_create_user
 # consul_status
 # nomad_status
 #  fcmd_init_gituser "$ZGIT_HOME" "$ZGIT_USER"
@@ -439,24 +467,6 @@ cmd_init() {
 #  echo
 #  echo "Be sure to upload a public key for your user to $ZGIT_HOME/.ssh/authorized_keys"
 }
-
-## Create a git user on the system with home directory and
-## an authorized_keys file that contains public keys for all users
-## that are allowed to push their repos here.
-## User defaults to $ZGIT_USER which defaults to 'git'.
-#fcmd_init_gituser() {
-#  echo "Initializing git user"
-#  declare git_home="$1" git_user="$2" || true
-#  useradd -d "$git_home" "$git_user" || true
-#  mkdir -p "$git_home/.ssh"
-#  touch "$git_home/.ssh/authorized_keys"
-#  cp "$ZSCRIPT_PATH" "$git_home"
-#  chmod +x "$git_home/zcloud"
-#  chown -R "$git_user" "$git_home"
-#  groupadd docker || true
-#  usermod -aG docker ${git_user}
-#  echo "Created user '$git_user' with '$git_home' directory."
-#}
 
 #fcmd_init_docker_swarm() {
 #  echo "Initializing docker swarm"
