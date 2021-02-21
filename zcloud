@@ -321,6 +321,7 @@ git_create_user() {
   cp "$ZTMP/.env" "$ZHOME/.env"
   chmod +x "$ZHOME/zcloud"
   mkdir -p "$ZHOME/apps"
+  mkdir -p "$ZHOME/.apps"
   chown -R "$ZUSER" "$ZHOME"
   groupadd --system --force docker
   usermod -aG docker "$ZUSER"
