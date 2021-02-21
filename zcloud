@@ -334,9 +334,16 @@ publicproxy_setup() {
   declare repo="$ZHOME/.apps/$appname"
   "$ZHOME/zcloud" create $appname
   publicproxy_create_nomad_job_file
+  publicproxy_create_waypoint_file
   git clone $barerepo $repo
+  cp "$ZTMP/publicproxy.nomad.hcl" "$repo/nomad.hcl"
+  cp "$ZTMP/publicproxy.waypoint.hcl" "$repo/waypoint.hcl"
+  # build required for just put a temp one for now: https://github.com/hashicorp/waypoint/issues/617
+  cat <<EOF > "$repo/Dockerfile"
+FROM traefik:v${ZTRAEFIK_VERSION}
+EOF
   chown -R "$ZUSER:$ZUSER" "$repo" "$barerepo"
-  cp "$ZTMP/publicproxy.nomad" "$repo/publicproxy.nomad"
+  nomad stop "$appname" || true
   cd $repo
   git config user.name zcloud
   git config user.email zcloud@zcloud.com
@@ -344,17 +351,16 @@ publicproxy_setup() {
   git commit -m "inital commit"
   git push origin master
   cd -
-  rm -rf $repo
 }
 
 publicproxy_create_nomad_job_file() {
-  if [ -f publicproxy.nomad ]; then
-    cp publicproxy.nomad "$ZTMP/publicproxy.nomad"
+  if [ -f publicproxy.nomad.hcl ]; then
+    cp publicproxy.nomad.hcl "$ZTMP/publicproxy.nomad.hcl"
   else
-    cat <<EOFNOMAD > "$ZTMP/publicproxy.nomad"
+    cat <<EOFNOMAD > "$ZTMP/publicproxy.nomad.hcl"
 job "publicproxy" {
     region = "$ZREGION"
-    datacenters = [$ZDATACENTER]
+    datacenters = ["$ZDATACENTER"]
     type = "service"
 
     group "traefik" {
@@ -421,6 +427,29 @@ EOF
     }
 }
 EOFNOMAD
+  fi
+}
+
+publicproxy_create_waypoint_file() {
+  if [ -f publicproxy.waypoint.hcl ]; then
+    cp publicproxy.waypoint.hcl "$ZTMP/publicproxy.waypoint.hcl"
+  else
+    cat <<EOF > "$ZTMP/publicproxy.waypoint.hcl"
+project = "publicproxy"
+app "publicproxy" {
+  build {
+    use "docker" {}
+  }
+  deploy {
+    use "exec" {
+      command = ["nomad", "run", "nomad.hcl"]
+    }
+  }
+  url {
+    auto_hostname = false
+  }
+}
+EOF
   fi
 }
 
