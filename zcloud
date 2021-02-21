@@ -304,6 +304,48 @@ waypoint_install() {
   cp "$ZTMP/waypoint" "/usr/local/bin/waypoint"
 }
 
+## Create a git user on the system with home directory and
+## an authorized_keys file that contains public keys for all users
+## that are allowed to push their repos here.
+## User defaults to $ZGIT_USER which defaults to 'git'.
+git_create_user() {
+  echo "Initializing git user"
+  id $ZUSER >& /dev/null || useradd -d "$ZHOME" "$ZUSER"
+  mkdir -p "$ZHOME/.ssh"
+  if [ -f "authorized_keys" ]; then
+    cp "authorized_keys" "$ZHOME/.ssh/authorized_keys"
+  else
+    touch "$ZHOME/.ssh/authorized_keys"
+  fi
+  cp "$ZSCRIPT_PATH" "$ZHOME/zcloud"
+  cp "$ZTMP/.env" "$ZHOME/.env"
+  chmod +x "$ZHOME/zcloud"
+  mkdir -p "$ZHOME/apps"
+  chown -R "$ZUSER" "$ZHOME"
+  groupadd --system --force docker
+  usermod -aG docker "$ZUSER"
+  echo "Created user '$ZUSER' with '$ZHOME' directory."
+}
+
+publicproxy_setup() {
+  declare appname="publicproxy"
+  declare barerepo="$ZHOME/apps/$appname"
+  declare repo="$ZHOME/.apps/$appname"
+  "$ZHOME/zcloud" create $appname
+  publicproxy_create_nomad_job_file
+  git clone $barerepo $repo
+  chown -R "$ZUSER:$ZUSER" "$repo" "$barerepo"
+  cp "$ZTMP/publicproxy.nomad" "$repo/publicproxy.nomad"
+  cd $repo
+  git config user.name zcloud
+  git config user.email zcloud@zcloud.com
+  git add .
+  git commit -m "inital commit"
+  git push origin master
+  cd -
+  rm -rf $repo
+}
+
 publicproxy_create_nomad_job_file() {
   if [ -f publicproxy.nomad ]; then
     cp publicproxy.nomad "$ZTMP/publicproxy.nomad"
@@ -381,29 +423,6 @@ EOFNOMAD
   fi
 }
 
-## Create a git user on the system with home directory and
-## an authorized_keys file that contains public keys for all users
-## that are allowed to push their repos here.
-## User defaults to $ZGIT_USER which defaults to 'git'.
-git_create_user() {
-  echo "Initializing git user"
-  id $ZUSER >& /dev/null || useradd -d "$ZHOME" "$ZUSER"
-  mkdir -p "$ZHOME/.ssh"
-  if [ -f "authorized_keys" ]; then
-    cp "authorized_keys" "$ZHOME/.ssh/authorized_keys"
-  else
-    touch "$ZHOME/.ssh/authorized_keys"
-  fi
-  cp "$ZSCRIPT_PATH" "$ZHOME/zcloud"
-  cp "$ZTMP/.env" "$ZHOME/.env"
-  chmod +x "$ZHOME/zcloud"
-  mkdir -p "$ZHOME/apps"
-  chown -R "$ZUSER" "$ZHOME"
-  groupadd --system --force docker
-  usermod -aG docker "$ZUSER"
-  echo "Created user '$ZUSER' with '$ZHOME' directory."
-}
-
 #export ZUSER="${ZUSER:-$USER}"
 #export ZSSH_AUTHORIZED_KEYES="$HOME/.ssh/authorized_keys"
 #export ZCA_EMAIL="${ZCA_EMAIL:-}"
@@ -464,8 +483,7 @@ cmd_init() {
   waypoint_download
   waypoint_install
   git_create_user
-  "$ZHOME/zcloud" create publicproxy
-  publicproxy_create_nomad_job_file
+  publicproxy_setup
 # consul_status
 # nomad_status
 #  fcmd_init_gituser "$ZGIT_HOME" "$ZGIT_USER"
@@ -613,11 +631,12 @@ EOF
 #  mv "$repo_src" "${repo_src}.old"
 #}
 
-#cmd_git-post-receive() {
-#  declare repo_src=$(readlink -f $GIT_DIR)
-#  declare name=$(basename "$repo_src")
-#  declare repo_dest="$ZGIT_HOME/.repo.${name}"
-#  declare branch=master
+cmd_git-post-receive() {
+  echo "-----> zcloud git post-receive hook received ..."
+ # declare repo_src=$(readlink -f $GIT_DIR)
+ # declare name=$(basename "$repo_src")
+ # declare repo_dest="$ZGIT_HOME/.repo.${name}"
+ # declare branch=master
 
 #  mkdir -p "$repo_dest"
 
@@ -650,7 +669,7 @@ EOF
 #    echo "-----> Ignoring deployment due to missing waypoint.hcl and docker-compose.yml"
 #  fi
 #  echo
-#}
+}
 
 subcommand=$1
 case $subcommand in
