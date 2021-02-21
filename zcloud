@@ -634,42 +634,42 @@ EOF
 
 cmd_git-post-receive() {
   echo "-----> zcloud git post-receive hook received ..."
- # declare repo_src=$(readlink -f $GIT_DIR)
- # declare name=$(basename "$repo_src")
- # declare repo_dest="$ZGIT_HOME/.repo.${name}"
- # declare branch=master
+  declare barerepo=$(readlink -f $GIT_DIR)
+  declare appname=$(basename "$barerepo")
+  declare repo="$ZGIT_HOME/.apps/${appname}"
+  declare branch=master
 
-#  mkdir -p "$repo_dest"
+  mkdir -p "$repo"
 
-#  while read oldrev newrev ref
-#    do
-#      # only checking out the master
-#      if [ "$ref" = "refs/heads/$branch" ]; then
-#        git --work-tree=$repo_dest --git-dir=$GIT_DIR checkout -f $branch
-#        chown -R "$ZGIT_USER:$ZGIT_USER" "$repo_src" "$repo_dest"
-#      else
-#        echo "Ref $ref received. Doing nothing: only the ${branch} branch may be deployed on this server."
-#	exit 0
-#      fi
-#  done
+  while read oldrev newrev ref
+    do
+      # only checking out the master
+      if [ "$ref" = "refs/heads/$branch" ]; then
+        git --work-tree=$repo --git-dir=$GIT_DIR checkout -f $branch
+        chown -R "$ZGIT_USER:$ZGIT_USER" "$barerepo" "$repo"
+      else
+        echo "Ref $ref received. Doing nothing: only the ${branch} branch may be deployed on this server."
+        exit 0
+      fi
+  done
 
-#  echo "-----> Deploying $name ..."
-#  if [ -f "$repo_dest/waypoint.hcl" ]; then
-#    cd "$repo_dest"
-#    echo "-----> waypoint init $name ..."
-#    waypoint init
-#    echo "-----> waypoint init $name complete!"
-#    echo "-----> waypoint up $name ..."
-#    waypoint up -plain
-#    echo "-----> waypoint up $name complete!"
-#    cd -
-#  elif [ -f "$repo_dest/docker-compose.yml" ]; then
-#    docker stack deploy --prune -c "$repo_dest/docker-compose.yml" "$name"
-#    echo "-----> Application Deployed!"
-#  else
-#    echo "-----> Ignoring deployment due to missing waypoint.hcl and docker-compose.yml"
-#  fi
-#  echo
+  echo "-----> Deploying $appname ..."
+  if [ -f "$repo/waypoint.hcl" ]; then
+    cd "$repo"
+    echo "-----> waypoint init $appname ..."
+    waypoint init
+    echo "-----> waypoint init $appname complete!"
+    echo "-----> waypoint up $appname ..."
+    waypoint up -plain
+    echo "-----> waypoint up $appname complete!"
+    cd -
+  # elif [ -f "$repo_dest/docker-compose.yml" ]; then
+  #   docker stack deploy --prune -c "$repo_dest/docker-compose.yml" "$name"
+  #   echo "-----> Application Deployed!"
+  else
+    echo "-----> Ignoring deployment due to missing waypoint.hcl"
+  fi
+  echo
 }
 
 subcommand=$1
