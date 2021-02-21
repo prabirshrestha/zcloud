@@ -293,12 +293,12 @@ waypoint_install() {
   cp "$ZTMP/waypoint" "/usr/local/bin/waypoint"
 }
 
-traefik_create_nomad_job_file() {
-  if [ -f traefik.nomad ]; then
-    cp traefik.nomad "$ZTMP/traefik.nomad"
+publicproxy_create_nomad_job_file() {
+  if [ -f publicproxy.nomad ]; then
+    cp publicproxy.nomad "$ZTMP/publicproxy.nomad"
   else
-    cat <<EOFNOMAD > "$ZTMP/traefik.nomad"
-job "traefik" {
+    cat <<EOFNOMAD > "$ZTMP/publicproxy.nomad"
+job "publicproxy" {
     region = "$ZREGION"
     datacenters = [$ZDATACENTER]
     type = "service"
@@ -429,7 +429,7 @@ cmd_init() {
   nomad_install
   waypoint_download
   waypoint_install
-  traefik_create_nomad_job_file
+  publicproxy_create_nomad_job_file
 # consul_status
 # nomad_status
 #  fcmd_init_gituser "$ZGIT_HOME" "$ZGIT_USER"
