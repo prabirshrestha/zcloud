@@ -71,6 +71,8 @@ Subcommands:
 
 - [ ] add support for [vault](https://www.waypointproject.io/plugins/vault)
 - [ ] add support for [Let's Encrypt](https://letsencrypt.org/). Depends on https://github.com/hashicorp/waypoint/issues/1125
+- [ ] add support for automatically generating default `waypoint.hcl`
+- [ ] add support for multiple servers
 
 # Support Operating Systems
 
