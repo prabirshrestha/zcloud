@@ -325,7 +325,7 @@ git_create_user() {
   cp "$ZSCRIPT_PATH" "$ZHOME/zcloud"
   cp "$ZTMP/.env" "$ZHOME/.env"
   chmod +x "$ZHOME/zcloud"
-  ln -s "$ZHOME/zcloud" /usr/local/bin/zcloud
+  ln -f -s "$ZHOME/zcloud" /usr/local/bin/zcloud
   mkdir -p "$ZHOME/apps"
   mkdir -p "$ZHOME/.apps"
   chown -R "$ZUSER" "$ZHOME"
