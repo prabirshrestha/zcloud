@@ -10,12 +10,6 @@ while [ -h "$PRG" ] ; do
 done
 scriptdir=`dirname "$PRG"`
 
-if [ -f "/etc/arch-release" ]; then
-  export ZPKG_MANAGER="pacman"
-else
-  export ZPKG_MANAGER="apt-get"
-fi
-
 setup_env() {
   export ZSERVER_IP="${ZSERVER_IP:-127.0.0.1}"
   export ZREGION="${ZREGION:-global}"
@@ -23,7 +17,6 @@ setup_env() {
   export ZFIREWALL="${ZFIREWALL:-1}"
 
   export ZTMP=${ZTMP:-./tmp}
-  export ZDEST="${ZDEST:-/usr/local/bin}"
   export ZOS="${ZOS:-linux}"
   export ZARCH="${ZARCH:-}"
   if [ "$ZADDR" = "" ]; then
@@ -62,12 +55,13 @@ setup_env() {
 
 create_env() {
   cat <<EOF > "$ZTMP/.env"
+export ZARCH="$ZARCH"
 export ZHOME="$ZHOME"
 export ZUSER="$ZUSER"
-export ZDEST="$ZDEST"
-export ZSERVER_IP="${ZSERVER_IP}"
-export ZREGION="${ZREGION}"
-export ZDATACENTER="${ZDATACENTER}"
+export ZSERVER_IP="$ZSERVER_IP"
+export ZREGION="$ZREGION"
+export ZDATACENTER="$ZDATACENTER"
+export ZFIREWALL="$ZFIREWALL"
 export ZCONSUL_VERSION="$ZCONSUL_VERSION"
 export ZCONSUL_URL="$ZCONSUL_URL"
 export ZCONSUL_GROUP="$ZCONSUL_GROUP"
@@ -88,6 +82,12 @@ create_tmp_dir() {
 }
 
 pkgs_install() {
+  if [ -f "/etc/arch-release" ]; then
+    export ZPKG_MANAGER="pacman"
+  else
+    export ZPKG_MANAGER="apt-get"
+  fi
+
   if [ "$ZPKG_MANAGER" = "pacman" ]; then
     $ZSUDO "$ZPKG_MANAGER" -Syy
     $ZSUDO "$ZPKG_MANAGER" -S --noconfirm git docker ufw
@@ -190,7 +190,6 @@ consul_stop() {
 }
 
 consul_install() {
-  # consul_uninstall &> /dev/null
   mkdir -p /var/lib/consul /etc/consul.d
   cp "$ZTMP/consul.config.json" /etc/consul.d/config.json
   chown -R $ZCONSUL_USER:$ZCONSUL_USER /var/lib/consul /etc/consul.d
@@ -201,10 +200,6 @@ consul_install() {
   systemctl start consul
   systemctl enable consul
   systemctl status consul --no-pager
-}
-
-consul_uninstall() {
-  service=consul; systemctl stop $service && systemctl disable $service && rm /etc/systemd/system/$service && systemctl daemon-reload && systemctl reset-failed
 }
 
 consul_status() {
@@ -273,7 +268,6 @@ nomad_stop() {
 }
 
 nomad_install() {
-  # nomad_uninstall &> /dev/null
   mkdir -p /var/lib/nomad /etc/nomad.d
   cp "$ZTMP/nomad.hcl" /etc/nomad.d/nomad.hcl
   chmod -R 775 /var/lib/nomad /etc/nomad.d
@@ -461,14 +455,6 @@ EOF
   fi
 }
 
-#export ZUSER="${ZUSER:-$USER}"
-#export ZSSH_AUTHORIZED_KEYES="$HOME/.ssh/authorized_keys"
-#export ZCA_EMAIL="${ZCA_EMAIL:-}"
-#export ZGIT_USER="${ZGIT_USER:-git}"
-#export ZGIT_HOME="${ZGIT_HOME:-/home/$ZGIT_USER}"
-#export ZGIT_PATH="${ZGIT_PATH:-git}"
-#export ZADDR="${ZADDR:-}"
-
 cmd_help() {
   echo "Usage: $ZEXENAME <subcommand> [options]"
   echo "Subcommands:"
@@ -477,27 +463,6 @@ cmd_help() {
   echo "   destroy <name>   Destroy an app"
   echo "   help             Show help"
 }
-
-#cmd_install() {
-#  set -e
-#  echo "Installing..."
-
-#  echo "Installing required packages via $ZPKG_MANAGER"
-
-#  if [ "$ZPKG_MANAGER" = "pacman" ]; then
-#    $ZSUDO "$ZPKG_MANAGER" -Syy
-#    $ZSUDO "$ZPKG_MANAGER" -S --noconfirm git docker
-#  else
-#    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | $ZSUDO apt-key add -
-#    $ZSUDO add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-#    curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
-#    sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
-#    $ZSUDO "$ZPKG_MANAGER" update -y -qq
-#    $ZSUDO "$ZPKG_MANAGER" install -y -qq git docker-ce docker-ce-cli containerd.io apt-transport-https waypoint
-#    $ZSUDO systemctl start docker
-#    $ZSUDO systemctl enable docker
-#  fi
-#}
 
 cmd_init() {
   setup_env
@@ -526,101 +491,14 @@ cmd_init() {
   waypoint_install
   git_create_user
   publicproxy_setup
-# consul_status
-# nomad_status
-#  fcmd_init_gituser "$ZGIT_HOME" "$ZGIT_USER"
-#  fcmd_init_docker_swarm
-#  fcmd_init_docker_network
-#  fcmd_init_docker_traefik
-#  echo
-#  echo "Be sure to upload a public key for your user to $ZGIT_HOME/.ssh/authorized_keys"
+  consul_status
+  nomad_status
+  echo
+  echo "zcloud installation complete."
+  echo
+  echo "Be sure to upload a public key for your user to $ZHOME/.ssh/authorized_keys"
+  echo
 }
-
-#fcmd_init_docker_swarm() {
-#  echo "Initializing docker swarm"
-#  if [ "$(docker info --format '{{.Swarm.ControlAvailable}}')" = "false" ]; then
-#    if [ "$ZADDR" = "" ]; then
-#      echo "\$ZADDR required to initialize swarm"
-#      exit 1
-#    else
-#      docker swarm init --advertise-addr=${ZADDR}
-#      echo "Docker swarm initialized."
-#    fi
-#  else
-#    echo "Skipping docker swarm initialization."
-#  fi
-#}
-
-#fcmd_init_docker_network() {
-#  declare network_name="traefik-public"
-#  echo "Creating docker network ${network_name}"
-#  if [ -z $(docker network ls --filter name="^${network_name}$" --format="{{ .Name }}") ]; then
-#    docker network create --driver=overlay ${network_name}
-#    echo "Docker network ${network_name} created."
-#  else
-#    echo "Docker network ${network_name} already exists. Skipping."
-#  fi
-#}
-
-#fcmd_init_docker_traefik() {
-#  declare name=router
-#  declare repo_src="$ZGIT_HOME/$name"
-#  declare repo_dest="$ZGIT_HOME/.repo.${name}"
-#  $ZGIT_HOME/zcloud create $name
-#  $ZGIT_PATH clone $repo_src $repo_dest
-#  chown -R "$ZGIT_USER:$ZGIT_USER" "$repo_src" "$repo_dest"
-#  if [ ! -f router.yml ]; then
-#    cat <<EOF >> $repo_dest/docker-compose.yml
-#version: '3'
-#services:
-#  reverse-proxy:
-#    image: traefik:v2.4
-#    command:
-#      - "--providers.docker.endpoint=unix:///var/run/docker.sock"
-#      - "--providers.docker.swarmMode=true"
-#      - "--providers.docker.exposedbydefault=false"
-#      - "--providers.docker.network=traefik-public"
-#      - "--entrypoints.web.address=:80"
-#      - "--entrypoints.websecure.address=:443"
-#      - "--certificatesresolvers.letsencryptresolver.acme.httpchallenge=true"
-#      - "--certificatesresolvers.letsencryptresolver.acme.httpchallenge.entrypoint=web"
-#      - "--certificatesresolvers.letsencryptresolver.acme.email=${ZCA_EMAIL}"
-#      - "--certificatesresolvers.letsencryptresolver.acme.storage=/letsencrypt/acme.json"
-#      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
-#      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
-#      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
-#    ports:
-#      - 80:80
-#      - 443:443
-#    volumes:
-#      # To persist certificates
-#      - traefik-certificates:/letsencrypt
-#      # So that Traefik can listen to the Docker events
-#      - /var/run/docker.sock:/var/run/docker.sock:ro
-#    networks:
-#      - traefik-public
-#    deploy:
-#      placement:
-#        constraints:
-#          - node.role == manager
-#volumes:
-#  traefik-certificates:
-#networks:
-#  traefik-public:
-#    external: true
-#EOF
-#  else
-#    cp router.yml $repo_dest/docker-compose.yml
-#  fi
-#  cd $repo_dest
-#  $ZGIT_PATH config user.name zcloud
-#  $ZGIT_PATH config user.email zcloud@zcloud.com
-#  $ZGIT_PATH add .
-#  $ZGIT_PATH commit -m "initial commit"
-#  $ZGIT_PATH push origin master
-#  cd -
-#  rm -rf $repo_dest
-#}
 
 load_zcloud_env() {
   echo "$scriptdir"
@@ -662,16 +540,18 @@ EOF
   echo "git push zcloud master"
 }
 
-#cmd_destroy() {
-#  set -e
-#  declare name="$1"
-#  declare repo_src="$ZGIT_HOME/$name"
-#  declare repo_dest="$ZGIT_HOME/.repo.$name"
-#  docker stack rm "$name" || true
-#  rm -rf "$repo_dest"
-#  rm -rf "${repo_src}.old"
-#  mv "$repo_src" "${repo_src}.old"
-#}
+cmd_destroy() {
+  set -e
+  load_zcloud_env
+  declare appname="$1"
+  declare barerepo="$ZHOME/apps/$name"
+  declare repo="$ZHOME/.apps/$name"
+  cd "$repo"
+  waypoint destroy
+  cd -
+  rm -rf "$repo"
+  rm -rf "$barerepo"
+}
 
 cmd_git-post-receive() {
   echo "-----> zcloud git post-receive hook received ..."
@@ -687,7 +567,7 @@ cmd_git-post-receive() {
       # only checking out the master
       if [ "$ref" = "refs/heads/$branch" ]; then
         git --work-tree=$repo --git-dir=$GIT_DIR checkout -f $branch
-        chown -R "$ZGIT_USER:$ZGIT_USER" "$barerepo" "$repo"
+        chown -R "$ZUSER:$ZUSER" "$barerepo" "$repo"
       else
         echo "Ref $ref received. Doing nothing: only the ${branch} branch may be deployed on this server."
         exit 0
