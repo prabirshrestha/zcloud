@@ -6,6 +6,10 @@ app "hello" {
     }
 
     deploy {
-        use "nomad" {}
+        use "nomad" {
+            static_environment = {
+                "env" = "production"
+            }
+        }
     }
 }
