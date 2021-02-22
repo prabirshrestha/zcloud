@@ -235,6 +235,7 @@ server {
 }
 client {
   enabled = true
+  servers = ["$ZSERVER_IP"]
 }
 EOF
   fi
@@ -368,12 +369,12 @@ job "publicproxy" {
 
         network {
             port "http" {
-                static = 8080
+                static = 80
             }
 
-            port "api" {
-                static = 8081
-            }
+            # port "api" {
+            #     static = 8081
+            # }
         }
 
         service {
@@ -410,7 +411,7 @@ job "publicproxy" {
     address = ":8081"
 
 [api]
-    dashboard = true
+    dashboard = false
     insecure = true
 
 [providers.consulCatalog.endpoint]
