@@ -282,6 +282,10 @@ nomad_install() {
   systemctl daemon-reload
   systemctl start nomad
   systemctl enable nomad
+  echo 'Waiting for nomad server to start ...'
+  while ! nomad status &> /dev/null; do
+    sleep 1
+  done
   systemctl status nomad --no-pager
 }
 
@@ -321,6 +325,7 @@ git_create_user() {
   cp "$ZSCRIPT_PATH" "$ZHOME/zcloud"
   cp "$ZTMP/.env" "$ZHOME/.env"
   chmod +x "$ZHOME/zcloud"
+  ln -s "$ZHOME/zcloud" /usr/local/bin/zcloud
   mkdir -p "$ZHOME/apps"
   mkdir -p "$ZHOME/.apps"
   chown -R "$ZUSER" "$ZHOME"
@@ -344,7 +349,9 @@ publicproxy_setup() {
 FROM traefik:v${ZTRAEFIK_VERSION}
 EOF
   chown -R "$ZUSER:$ZUSER" "$repo" "$barerepo"
-  nomad stop "$appname" || true
+  if nomad status "$appname" > /dev/null; then
+    nomad stop "$appname" || true
+  fi
   cd $repo
   git config user.name zcloud
   git config user.email zcloud@zcloud.com
@@ -406,9 +413,9 @@ job "publicproxy" {
                 data = <<EOF
 [entryPoints]
     [entryPoints.htp]
-    address = ":8080"
-    [entryPoints.traefik]
-    address = ":8081"
+    address = ":80"
+    # [entryPoints.traefik]
+    # address = ":8081"
 
 [api]
     dashboard = false
@@ -494,6 +501,10 @@ cmd_help() {
 
 cmd_init() {
   setup_env
+  if [ -d "$ZHOME" ]; then
+    echo "$ZHOME exists. Please remove the directory before init."
+    exit 1
+  fi
   create_tmp_dir
   create_env
   print_env
