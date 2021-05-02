@@ -19,7 +19,7 @@ setup_env() {
   export ZTMP=${ZTMP:-./tmp}
   export ZOS="${ZOS:-linux}"
   export ZARCH="${ZARCH:-}"
-  if [ "$ZADDR" = "" ]; then
+  if [ "$ZARCH" = "" ]; then
     _arch=$(uname -m)
     case "${_arch}" in
       'x86_64')
