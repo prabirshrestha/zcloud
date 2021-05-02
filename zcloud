@@ -99,7 +99,7 @@ pkgs_install() {
     curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
     sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
     "$ZPKG_MANAGER" update -y -qq
-    "$ZPKG_MANAGER" install -y -qq git docker-ce docker-ce-cli containerd.io apt-transport-https ufw
+    "$ZPKG_MANAGER" install -y -qq git docker-ce docker-ce-cli containerd.io apt-transport-https ufw unzip
     systemctl start docker
     systemctl enable docker
   fi
