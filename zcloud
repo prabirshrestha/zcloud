@@ -555,9 +555,10 @@ cmd_destroy() {
 
 cmd_git-post-receive() {
   echo "-----> zcloud git post-receive hook received ..."
+  setup_env
   declare barerepo=$(readlink -f $GIT_DIR)
   declare appname=$(basename "$barerepo")
-  declare repo="$ZGIT_HOME/.apps/${appname}"
+  declare repo="$ZHOME/.apps/${appname}"
   declare branch=master
 
   mkdir -p "$repo"
