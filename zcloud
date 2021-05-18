@@ -44,7 +44,7 @@ setup_env() {
   export ZNOMAD_VERSION="${ZNOMAD_VERSION:-1.0.4}"
   export ZNOMAD_URL="${ZNOMAD_URL:-https://releases.hashicorp.com/nomad/${ZNOMAD_VERSION}/nomad_${ZNOMAD_VERSION}_${ZOS}_${ZARCH}.zip}"
 
-  export ZWAYPOINT_VERSION="${ZWAYPOINT_VERSION:-0.3.1}"
+  export ZWAYPOINT_VERSION="${ZWAYPOINT_VERSION:-0.3.2}"
   export ZWAYPOINT_URL="${ZWAYPOINT_URL:-https://releases.hashicorp.com/waypoint/${ZWAYPOINT_VERSION}/waypoint_${ZWAYPOINT_VERSION}_linux_${ZARCH}.zip}"
 
   export ZTRAEFIK_VERSION="${ZTRAEFIK_VERSION:-2.4.8}"
