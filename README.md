@@ -1,24 +1,19 @@
 # zcloud
 
-Personal Heroku style git push cloud.
+Personal Heroku style git push cloud. Currently only works on a single machine.
 
 # Install
-
-* Replace `1.1.1.1` with the correct public ip address to initailize docker
-swarm.
-* Replace `ZCA_EMAIL=ca@email` with corect email address for let's encrypt certs.
 
 ```bash
 $ # login to ssh server and run the following commands
 $ ssh user@server
 $ wget https://raw.githubusercontent.com/prabirshrestha/zcloud/master/zcloud
 $ chmod +x zcloud
-$ sudo ./zcloud install
-$ sudo ZADDR=1.1.1.1 ZCA_EMAIL=ca@email.com ./zcloud init
-$ rm ./zcloud           # use zcloud from /home/git/zcloud instead
+$ sudo ZSERVER_IP=127.0.0.1 ./zcloud init
+$ rm ./zcloud           # use zcloud from /home/zcloud/zcloud instead
 $ exit                  # exit from ssh server
 $ # copy ssh public key from local machine to server for git user
-$ cat ~/.ssh/id_rsa.pub | ssh user@server "sudo tee -a /home/git/.ssh/authorized_keys"
+$ cat ~/.ssh/id_rsa.pub | ssh user@server "sudo tee -a /home/zcloud/.ssh/authorized_keys"
 ```
 
 ## Deploy your first app
@@ -26,47 +21,25 @@ $ cat ~/.ssh/id_rsa.pub | ssh user@server "sudo tee -a /home/git/.ssh/authorized
 ### Create an empty app on the server
 
 ```bash
-$ ssh git@server
-$ ./zcloud create helloworld
+$ ssh zcloud@server                 # notice the use zcloud
+$ zcloud create helloworld
 $ exit
 ```
 
-### add a docker-compose.yml file in the root of the git repo on the client
+Refer to the [examples](examples/) folder.
 
-Make sure to update the DNS records so the host is picked up correctly.
-
-```docker
-version: '3'
-services:
-  helloworld:
-    image: traefik/whoami
-    networks:
-     - traefik-public
-    deploy:
-      labels:
-        - "traefik.enable=true"
-        - "traefik.http.routers.helloworld.rule=Host(`helloworld.zcloud.com`)"
-        - "traefik.http.routers.helloworld.entrypoints=websecure"
-        - "traefik.http.routers.helloworld.tls.certresolver=letsencryptresolver"
-        - "traefik.http.services.helloworld.loadbalancer.server.port=80"
-
-networks:
-  traefik-public:
-    external: true
-```
 
 ### add git remote and push
 
 ```
-$ git remote add zcloud git@server:helloworld
+$ git remote add zcloud zcloud@server:apps/helloworld
 $ git push zcloud master
 ```
 
 ## delete app
 
-* Login to server and remove the docker stack using `docker stack rm name`.
-* If using `waypoint.hcl` go to the `/home/git/repo.appname` and run `waypoint destroy .`
-* Delete `/home/git/appname` and `/home/git/.repo.appname` folders.
+* Login to the server
+* run `zcloud destroy helloworld`
 
 # Commands
 
@@ -76,17 +49,32 @@ $ git push zcloud master
 $ ./zcloud help
 Usage: zcloud <subcommand> [options]
 Subcommands:
-   install        Install prerequisites (requires sudo)
-   init           Initializes server (requires sudo)
-   create <name>  Create empty app
-   help           Show help
+   init             Initializes server (requires sudo)
+   create  <name>   Create empty app
+   destroy <name>   Create empty app
+   help             Show help
 ```
+
+# Features
+
+- [x] automated download/installation/setup
+- [x] better default firewall support for security
+- [x] use `git push` for deployments
+- [x] use [Waypoint](https://www.waypointproject.io/) for builds and deployments
+- [x] add support for [Cloud Native Buildpacks](https://buildpacks.io/)
+- [x] add [docker](https://www.docker.com/) support.
+- [x] use [consul](https://www.consul.io/) for configuration and service discovery
+- [x] use [nomad](https://github.com/hashicorp/nomad) orchestration
+- [x] use [traefik](https://traefik.io/traefik/) for reverse proxy
 
 # Roadmap
 
-- [ ] use [HashiCorp Waypoint](https://www.waypointproject.io/) to build and deploy.
-- [ ] add support for using nomad
+- [ ] add support for [vault](https://www.waypointproject.io/plugins/vault)
+- [ ] add support for [Let's Encrypt](https://letsencrypt.org/). Depends on https://github.com/hashicorp/waypoint/issues/1125
+- [ ] add support for automatically generating default `waypoint.hcl`
+- [ ] add support for multiple servers
 
 # Support Operating Systems
 
+* Archlinux
 * Ubuntu

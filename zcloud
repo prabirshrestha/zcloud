@@ -1,243 +1,595 @@
 #!/usr/bin/env bash
+set -e
+
 ZEXENAME=$(basename $0)
 ZSCRIPT_PATH=$(readlink -m $( type -p $0 ))
+PRG="$0"
+# need this for relative symlinks
+while [ -h "$PRG" ] ; do
+   PRG=`readlink "$PRG"`
+done
+scriptdir=`dirname "$PRG"`
 
-if [ -f "/etc/arch-release" ]; then
-  export ZPKG_MANAGER="pacman"
-else
-  export ZPKG_MANAGER="apt-get"
-fi
+setup_env() {
+  export ZSERVER_IP="${ZSERVER_IP:-127.0.0.1}"
+  export ZREGION="${ZREGION:-global}"
+  export ZDATACENTER="${ZDATACENTER:-dc1}"
+  export ZFIREWALL="${ZFIREWALL:-1}"
 
-export ZUSER="${ZUSER:-$USER}"
-export ZSSH_AUTHORIZED_KEYES="$HOME/.ssh/authorized_keys"
-export ZCA_EMAIL="${ZCA_EMAIL:-}"
-export ZGIT_USER="${ZGIT_USER:-git}"
-export ZGIT_HOME="${ZGIT_HOME:-/home/$ZGIT_USER}"
-export ZGIT_PATH="${ZGIT_PATH:-git}"
-export ZADDR="${ZADDR:-}"
+  export ZTMP=${ZTMP:-./tmp}
+  export ZOS="${ZOS:-linux}"
+  export ZARCH="${ZARCH:-}"
+  if [ "$ZARCH" = "" ]; then
+    _arch=$(uname -m)
+    case "${_arch}" in
+      'x86_64')
+        export ZARCH="amd64"
+        ;;
+      'aarch64')
+        export ZARCH="arm64"
+        ;;
+      *)
+        echo "ERROR: unsupported architecture"
+        exit 1
+        ;;
+    esac
+  fi
+  export ZCONSUL_VERSION="${ZCONSUL_VERSION:-1.9.5}"
+  export ZCONSUL_URL="${ZCONSUL_URL:-https://releases.hashicorp.com/consul/${ZCONSUL_VERSION}/consul_${ZCONSUL_VERSION}_${ZOS}_${ZARCH}.zip}"
+  export ZCONSUL_CONFIG_DIR="${ZCONSUL_CONFIG_DIR:-/consul/config}"
+  export ZCONSUL_GROUP="${ZCONSUL_GROUP:-consul}"
+  export ZCONSUL_USER="${ZCONSUL_USER:-consul}"
+  export ZCONSUL_ENCRYPT="${ZCONSUL_ENCRYPT:-}"
+
+  export ZNOMAD_VERSION="${ZNOMAD_VERSION:-1.1.0}"
+  export ZNOMAD_URL="${ZNOMAD_URL:-https://releases.hashicorp.com/nomad/${ZNOMAD_VERSION}/nomad_${ZNOMAD_VERSION}_${ZOS}_${ZARCH}.zip}"
+
+  export ZWAYPOINT_VERSION="${ZWAYPOINT_VERSION:-0.3.2}"
+  export ZWAYPOINT_URL="${ZWAYPOINT_URL:-https://releases.hashicorp.com/waypoint/${ZWAYPOINT_VERSION}/waypoint_${ZWAYPOINT_VERSION}_linux_${ZARCH}.zip}"
+
+  export ZTRAEFIK_VERSION="${ZTRAEFIK_VERSION:-2.4.8}"
+
+  export ZHOME="${ZHOME:-/home/zcloud}"
+  export ZUSER="${ZUSER:-zcloud}"
+}
+
+create_env() {
+  cat <<EOF > "$ZTMP/.env"
+export ZARCH="$ZARCH"
+export ZHOME="$ZHOME"
+export ZUSER="$ZUSER"
+export ZSERVER_IP="$ZSERVER_IP"
+export ZREGION="$ZREGION"
+export ZDATACENTER="$ZDATACENTER"
+export ZFIREWALL="$ZFIREWALL"
+export ZCONSUL_VERSION="$ZCONSUL_VERSION"
+export ZCONSUL_URL="$ZCONSUL_URL"
+export ZCONSUL_GROUP="$ZCONSUL_GROUP"
+export ZCONSUL_USER="$ZCONSUL_USER"
+export ZNOMAD_VERSION="$ZNOMAD_VERSION"
+export ZNOMAD_URL="$ZNOMAD_URL"
+export ZWAYPOINT_VERSION="$ZWAYPOINT_VERSION"
+export ZWAYPOINT_URL="$ZWAYPOINT_URL"
+EOF
+}
+
+print_env() {
+  cat "$ZTMP/.env"
+}
+
+create_tmp_dir() {
+  mkdir -p "$ZTMP"
+}
+
+pkgs_install() {
+  if [ -f "/etc/arch-release" ]; then
+    export ZPKG_MANAGER="pacman"
+  else
+    export ZPKG_MANAGER="apt-get"
+  fi
+
+  if [ "$ZPKG_MANAGER" = "pacman" ]; then
+    $ZSUDO "$ZPKG_MANAGER" -Syy
+    $ZSUDO "$ZPKG_MANAGER" -S --noconfirm git docker ufw
+    systemctl start docker
+    systemctl enable docker
+  else
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | $ZSUDO apt-key add -
+    add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+    curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
+    sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+    "$ZPKG_MANAGER" update -y -qq
+    "$ZPKG_MANAGER" install -y -qq git docker-ce docker-ce-cli containerd.io apt-transport-https ufw unzip
+    systemctl start docker
+    systemctl enable docker
+  fi
+}
+
+firewall_setup() {
+  if [ "$ZFIREWALL" == "1" ]; then
+    echo "Setting up firewall"
+    ufw status verbose
+    ufw default allow outgoing
+    ufw default deny incoming
+    ufw limit ssh
+    ufw allow http
+    ufw allow https
+    ufw enable
+    ufw status verbose
+    systemctl start ufw
+    systemctl enable ufw
+  fi
+}
+
+consul_download() {
+  if [ ! -f "$ZTMP/consul" ]; then
+    if [ ! -f "$ZTMP/consul.zip" ]; then
+      echo "Downloading ${ZCONSUL_URL} to ${ZTMP/consul.zip}"
+      curl -Lo "$ZTMP/consul.zip" "$ZCONSUL_URL" 
+    fi
+    unzip -o "$ZTMP/consul.zip" -d "$ZTMP"
+  fi
+  chmod 0755 "$ZTMP/consul"
+}
+
+consul_create_config() {
+  if [ -f consul.config.json ]; then
+    cp consul.config.json "$ZTMP/consul.config.json"
+  else
+    cat <<EOF > "$ZTMP/consul.config.json"
+{
+  "advertise_addr": "$ZSERVER_IP",
+  "bind_addr": "$ZSERVER_IP",
+  "bootstrap_expect": 1,
+  "datacenter": "${ZDATACENTER}",
+  "data_dir": "/var/lib/consul",
+  "encrypt": "${ZCONSUL_ENCRYPT}",
+  "log_level": "ERR",
+  "server": true,
+  "ui": false
+}
+EOF
+  fi
+}
+
+consul_create_systemd_file() {
+  if [ -f consul.service ]; then
+    cp consul.service "$ZTMP/consul.service"
+  else
+    cat <<EOF > "$ZTMP/consul.service"
+[Unit]
+Description=consul
+Documentation=https://consul.io/docs/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=consul
+Group=consul
+LimitNOFILE=1024
+ExecStart=/usr/local/bin/consul agent -config-dir=/etc/consul.d
+ExecReload=/bin/kill -HUP $MAINPID
+KillSignal=SIGINT
+TimeoutStopSec=5
+Restart=on-failure
+SyslogIdentifier=consul
+[Install]
+WantedBy=multi-user.target
+EOF
+  fi
+}
+
+consul_create_group_and_user() {
+  groupadd --system --force $ZCONSUL_GROUP
+  id $ZCONSUL_USER >& /dev/null || useradd -s /sbin/nologin --system -g $ZCONSUL_GROUP $ZCONSUL_USER
+}
+
+consul_stop() {
+  systemctl stop consul || true
+}
+
+consul_install() {
+  mkdir -p /var/lib/consul /etc/consul.d
+  cp "$ZTMP/consul.config.json" /etc/consul.d/config.json
+  chown -R $ZCONSUL_USER:$ZCONSUL_USER /var/lib/consul /etc/consul.d
+  chmod -R 775 /var/lib/consul /etc/consul.d
+  cp "$ZTMP/consul" "/usr/local/bin/consul"
+  cp "$ZTMP/consul.service" "/etc/systemd/system/consul.service"
+  systemctl daemon-reload
+  systemctl start consul
+  systemctl enable consul
+  systemctl status consul --no-pager
+}
+
+consul_status() {
+  consul members
+}
+
+nomad_download() {
+  if [ ! -f "$ZTMP/nomad" ]; then
+    if [ ! -f "$ZTMP/nomad.zip" ]; then
+      echo "Downloading ${ZNOMAD_URL} to ${ZTMP/nomad.zip}"
+      curl -Lo "$ZTMP/nomad.zip" "$ZNOMAD_URL"
+    fi
+    unzip -o "$ZTMP/nomad.zip" -d "$ZTMP"
+  fi
+  chmod 0755 "$ZTMP/nomad"
+}
+
+nomad_create_config() {
+  if [ -f nomad.hcl ]; then
+    cp nomad.hcl "$ZTMP/nomad.hcl"
+  else
+    cat <<EOF > "$ZTMP/nomad.hcl"
+datacenter="${ZDATACENTER}"
+data_dir="/var/lib/nomad"
+server {
+  enabled = true
+  bootstrap_expect = 1
+}
+client {
+  enabled = true
+  servers = ["$ZSERVER_IP"]
+}
+EOF
+  fi
+}
+
+nomad_create_systemd_file() {
+  if [ -f nomad.service ]; then
+    cp nomad.service "$ZTMP/nomad.service"
+  else
+    cat <<EOF > "$ZTMP/nomad.service"
+[Unit]
+Description=nomad
+Documentation=https://www.nomadproject.io/docs
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+LimitNOFILE=1024
+ExecStart=/usr/local/bin/nomad agent -config=/etc/nomad.d
+ExecReload=/bin/kill -HUP $MAINPID
+KillSignal=SIGINT
+TimeoutStopSec=5
+Restart=on-failure
+SyslogIdentifier=nomad
+TasksMax=infinity
+[Install]
+WantedBy=multi-user.target
+EOF
+  fi
+}
+
+nomad_stop() {
+  systemctl stop nomad || true
+}
+
+nomad_install() {
+  mkdir -p /var/lib/nomad /etc/nomad.d
+  cp "$ZTMP/nomad.hcl" /etc/nomad.d/nomad.hcl
+  chmod -R 775 /var/lib/nomad /etc/nomad.d
+  cp "$ZTMP/nomad" "/usr/local/bin/nomad"
+  cp "$ZTMP/nomad.service" "/etc/systemd/system/nomad.service"
+  systemctl daemon-reload
+  systemctl start nomad
+  systemctl enable nomad
+  echo 'Waiting for nomad server to start ...'
+  while ! nomad status &> /dev/null; do
+    sleep 1
+  done
+  systemctl status nomad --no-pager
+}
+
+nomad_status() {
+  nomad server members
+  nomad node status -verbose
+}
+
+waypoint_download() {
+  if [ ! -f "$ZTMP/waypoint" ]; then
+    if [ ! -f "$ZTMP/waypoint.zip" ]; then
+      echo "Downloading ${ZWAYPOINT_URL} to ${ZTMP/waypoint.zip}"
+      curl -Lo "$ZTMP/waypoint.zip" "$ZWAYPOINT_URL"
+    fi
+    unzip -o "$ZTMP/waypoint.zip" -d "$ZTMP"
+  fi
+  chmod 0755 "$ZTMP/waypoint"
+}
+
+waypoint_install() {
+  cp "$ZTMP/waypoint" "/usr/local/bin/waypoint"
+}
+
+## Create a git user on the system with home directory and
+## an authorized_keys file that contains public keys for all users
+## that are allowed to push their repos here.
+## User defaults to $ZGIT_USER which defaults to 'git'.
+git_create_user() {
+  echo "Initializing git user"
+  id $ZUSER >& /dev/null || useradd -d "$ZHOME" "$ZUSER"
+  mkdir -p "$ZHOME/.ssh"
+  if [ -f "authorized_keys" ]; then
+    cp "authorized_keys" "$ZHOME/.ssh/authorized_keys"
+  else
+    touch "$ZHOME/.ssh/authorized_keys"
+  fi
+  cp "$ZSCRIPT_PATH" "$ZHOME/zcloud"
+  cp "$ZTMP/.env" "$ZHOME/.env"
+  chmod +x "$ZHOME/zcloud"
+  ln -f -s "$ZHOME/zcloud" /usr/local/bin/zcloud
+  mkdir -p "$ZHOME/apps"
+  mkdir -p "$ZHOME/.apps"
+  chown -R "$ZUSER" "$ZHOME"
+  groupadd --system --force docker
+  usermod -aG docker "$ZUSER"
+  echo "Created user '$ZUSER' with '$ZHOME' directory."
+}
+
+publicproxy_setup() {
+  declare appname="publicproxy"
+  declare barerepo="$ZHOME/apps/$appname"
+  declare repo="$ZHOME/.apps/$appname"
+  "$ZHOME/zcloud" create $appname
+  publicproxy_create_nomad_job_file
+  publicproxy_create_waypoint_file
+  git clone $barerepo $repo
+  cp "$ZTMP/publicproxy.nomad.hcl" "$repo/nomad.hcl"
+  cp "$ZTMP/publicproxy.waypoint.hcl" "$repo/waypoint.hcl"
+  # build required for just put a temp one for now: https://github.com/hashicorp/waypoint/issues/617
+  cat <<EOF > "$repo/Dockerfile"
+FROM traefik:v${ZTRAEFIK_VERSION}
+EOF
+  chown -R "$ZUSER:$ZUSER" "$repo" "$barerepo"
+  if nomad status "$appname" > /dev/null; then
+    nomad stop "$appname" || true
+  fi
+  cd $repo
+  git config user.name zcloud
+  git config user.email zcloud@zcloud.com
+  git add .
+  git commit -m "inital commit"
+  git push origin master
+  cd -
+}
+
+publicproxy_create_nomad_job_file() {
+  if [ -f publicproxy.nomad.hcl ]; then
+    cp publicproxy.nomad.hcl "$ZTMP/publicproxy.nomad.hcl"
+  else
+    cat <<EOFNOMAD > "$ZTMP/publicproxy.nomad.hcl"
+job "publicproxy" {
+    region = "$ZREGION"
+    datacenters = ["$ZDATACENTER"]
+    type = "service"
+
+    group "traefik" {
+        count = 1
+
+        network {
+            port "http" {
+                static = 80
+            }
+
+            # port "api" {
+            #     static = 8081
+            # }
+        }
+
+        service {
+            name = "traefik"
+
+            check {
+                name = "alive"
+                type = "tcp"
+                port = "http"
+                interval = "10s"
+                timeout = "2s"
+            }
+        }
+
+        task "traefik" {
+            driver = "docker"
+
+            config {
+                image = "traefik:v${ZTRAEFIK_VERSION}"
+                network_mode = "host"
+
+                volumes = [
+                    "local/traefik.toml:/etc/traefik/traefik.toml"
+                ]
+            }
+
+            template {
+                destination = "local/traefik.toml"
+                data = <<EOF
+[entryPoints]
+    [entryPoints.htp]
+    address = ":80"
+    # [entryPoints.traefik]
+    # address = ":8081"
+
+[api]
+    dashboard = false
+    insecure = true
+
+[providers.consulCatalog.endpoint]
+    address = "$ZSERVER_IP:8500"
+    scheme = "http"
+EOF
+            }
+
+            resources {
+                cpu     = 100
+                memory  = 128
+            }
+        }
+    }
+}
+EOFNOMAD
+  fi
+}
+
+publicproxy_create_waypoint_file() {
+  if [ -f publicproxy.waypoint.hcl ]; then
+    cp publicproxy.waypoint.hcl "$ZTMP/publicproxy.waypoint.hcl"
+  else
+    cat <<EOF > "$ZTMP/publicproxy.waypoint.hcl"
+project = "publicproxy"
+app "publicproxy" {
+  build {
+    use "docker" {}
+  }
+  deploy {
+    use "exec" {
+      command = ["nomad", "run", "nomad.hcl"]
+    }
+  }
+  url {
+    auto_hostname = false
+  }
+}
+EOF
+  fi
+}
 
 cmd_help() {
   echo "Usage: $ZEXENAME <subcommand> [options]"
   echo "Subcommands:"
-  echo "   install        Install prerequisites (requires sudo)"
-  echo "   init           Initializes server (requires sudo)"
-  echo "   create <name>  Create empty app"
-  echo "   help           Show help"
-}
-
-cmd_install() {
-  set -e
-  echo "Installing..."
-
-  echo "Installing required packages via $ZPKG_MANAGER"
-
-  if [ "$ZPKG_MANAGER" = "pacman" ]; then
-    $ZSUDO "$ZPKG_MANAGER" -Syy
-    $ZSUDO "$ZPKG_MANAGER" -S --noconfirm git docker
-  else
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | $ZSUDO apt-key add -
-    $ZSUDO add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
-    curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
-    sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
-    $ZSUDO "$ZPKG_MANAGER" update -y -qq
-    $ZSUDO "$ZPKG_MANAGER" install -y -qq git docker-ce docker-ce-cli containerd.io apt-transport-https waypoint
-    $ZSUDO systemctl start docker
-    $ZSUDO systemctl enable docker
-  fi
+  echo "   init             Initializes server (requires sudo)"
+  echo "   create  <name>   Create an empty app"
+  echo "   destroy <name>   Destroy an app"
+  echo "   help             Show help"
 }
 
 cmd_init() {
-  fcmd_init_gituser "$ZGIT_HOME" "$ZGIT_USER"
-  fcmd_init_docker_swarm
-  fcmd_init_docker_network
-  fcmd_init_docker_traefik
+  setup_env
+  if [ -d "$ZHOME" ]; then
+    echo "$ZHOME exists. Please remove the directory before init."
+    exit 1
+  fi
+  create_tmp_dir
+  create_env
+  print_env
   echo
-  echo "Be sure to upload a public key for your user to $ZGIT_HOME/.ssh/authorized_keys"
+  pkgs_install
+  firewall_setup
+  consul_download
+  consul_create_config
+  consul_create_systemd_file
+  consul_create_group_and_user
+  consul_stop
+  consul_install
+  nomad_download
+  nomad_create_config
+  nomad_create_systemd_file
+  nomad_stop
+  nomad_install
+  waypoint_download
+  waypoint_install
+  git_create_user
+  publicproxy_setup
+  consul_status
+  nomad_status
+  echo
+  echo "zcloud installation complete."
+  echo
+  echo "Be sure to upload a public key for your user to $ZHOME/.ssh/authorized_keys"
+  echo
 }
 
-# Create a git user on the system with home directory and
-# an authorized_keys file that contains public keys for all users
-# that are allowed to push their repos here.
-# User defaults to $ZGIT_USER which defaults to 'git'.
-fcmd_init_gituser() {
-  echo "Initializing git user"
-  declare git_home="$1" git_user="$2" || true
-  useradd -d "$git_home" "$git_user" || true
-  mkdir -p "$git_home/.ssh"
-  touch "$git_home/.ssh/authorized_keys"
-  cp "$ZSCRIPT_PATH" "$git_home"
-  chmod +x "$git_home/zcloud"
-  chown -R "$git_user" "$git_home"
-  groupadd docker || true
-  usermod -aG docker ${git_user}
-  echo "Created user '$git_user' with '$git_home' directory."
-}
-
-fcmd_init_docker_swarm() {
-  echo "Initializing docker swarm"
-  if [ "$(docker info --format '{{.Swarm.ControlAvailable}}')" = "false" ]; then
-    if [ "$ZADDR" = "" ]; then
-      echo "\$ZADDR required to initialize swarm"
-      exit 1
-    else
-      docker swarm init --advertise-addr=${ZADDR}
-      echo "Docker swarm initialized."
-    fi
-  else
-    echo "Skipping docker swarm initialization."
+load_zcloud_env() {
+  echo "$scriptdir"
+  if [ -f "$scriptdir/.env" ]; then
+    source "$scriptdir/.env"
   fi
-}
-
-fcmd_init_docker_network() {
-  declare network_name="traefik-public"
-  echo "Creating docker network ${network_name}"
-  if [ -z $(docker network ls --filter name="^${network_name}$" --format="{{ .Name }}") ]; then
-    docker network create --driver=overlay ${network_name}
-    echo "Docker network ${network_name} created."
-  else
-    echo "Docker network ${network_name} already exists. Skipping."
-  fi
-}
-
-fcmd_init_docker_traefik() {
-  declare name=router
-  declare repo_src="$ZGIT_HOME/$name"
-  declare repo_dest="$ZGIT_HOME/.repo.${name}"
-  $ZGIT_HOME/zcloud create $name
-  $ZGIT_PATH clone $repo_src $repo_dest
-  chown -R "$ZGIT_USER:$ZGIT_USER" "$repo_src" "$repo_dest"
-  if [ ! -f router.yml ]; then
-    cat <<EOF >> $repo_dest/docker-compose.yml
-version: '3'
-services:
-  reverse-proxy:
-    image: traefik:v2.4
-    command:
-      - "--providers.docker.endpoint=unix:///var/run/docker.sock"
-      - "--providers.docker.swarmMode=true"
-      - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=traefik-public"
-      - "--entrypoints.web.address=:80"
-      - "--entrypoints.websecure.address=:443"
-      - "--certificatesresolvers.letsencryptresolver.acme.httpchallenge=true"
-      - "--certificatesresolvers.letsencryptresolver.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.letsencryptresolver.acme.email=${ZCA_EMAIL}"
-      - "--certificatesresolvers.letsencryptresolver.acme.storage=/letsencrypt/acme.json"
-      - "--entrypoints.web.http.redirections.entryPoint.to=websecure"
-      - "--entrypoints.web.http.redirections.entryPoint.scheme=https"
-      - "--entrypoints.web.http.redirections.entrypoint.permanent=true"
-    ports:
-      - 80:80
-      - 443:443
-    volumes:
-      # To persist certificates
-      - traefik-certificates:/letsencrypt
-      # So that Traefik can listen to the Docker events
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks:
-      - traefik-public
-    deploy:
-      placement:
-        constraints:
-          - node.role == manager
-volumes:
-  traefik-certificates:
-networks:
-  traefik-public:
-    external: true
-EOF
-  else
-    cp router.yml $repo_dest/docker-compose.yml
-  fi
-  cd $repo_dest
-  $ZGIT_PATH config user.name zcloud
-  $ZGIT_PATH config user.email zcloud@zcloud.com
-  $ZGIT_PATH add .
-  $ZGIT_PATH commit -m "initial commit"
-  $ZGIT_PATH push origin master
-  cd -
-  rm -rf $repo_dest
 }
 
 cmd_create() {
   set -e
+  load_zcloud_env
   declare name="$1"
-  declare repo_path="$ZGIT_HOME/$name"
+  declare barerepo="$ZHOME/apps/$name"
   if [ "$name" = "" ]; then
     echo "Name required"
     exit 1
   fi
-  echo "Creating app '$1'"
-  if [ ! -d "$repo_path" ]; then
-    mkdir -p "$repo_path"
-    cd "$repo_path"
-    "$ZGIT_PATH" init --bare
-    cd -
-    local postreceive_path="$repo_path/hooks/post-receive"
-    cat > "$postreceive_path" <<EOF
-#!/usr/bin/env bash
-set -eo pipefail;
-"\$PWD/../zcloud" git-post-receive
-EOF
-    chmod +x "$postreceive_path"
-    chown -R "$ZGIT_USER" "$repo_path"
-    echo
-    echo "Created repository $name"
-    echo
-    echo "git remote add zcloud git@server:$name"
-    echo "git push zcloud master"
-  else
+  if [ -d "$barerepo" ]; then
     echo "Failed to create duplicate app '$name'"
     exit 1
   fi
+  echo "Creating app '$1' at '$barerepo'."
+  mkdir -p "$barerepo"
+  cd "$barerepo"
+  git init --bare
+  cd -
+  local postreceive_path="$barerepo/hooks/post-receive"
+  cat > "$postreceive_path" <<EOF
+#!/usr/bin/env bash
+set -eo pipefail;
+"\$PWD/../../zcloud" git-post-receive
+EOF
+  chmod +x "$postreceive_path"
+  chown -R "$ZUSER" "$barerepo"
+  echo
+  echo "Created repository $name"
+  echo
+  echo "git remote add zcloud zcloud@server:apps/$name"
+  echo "git push zcloud master"
 }
 
 cmd_destroy() {
   set -e
-  declare name="$1"
-  declare repo_src="$ZGIT_HOME/$name"
-  declare repo_dest="$ZGIT_HOME/.repo.$name"
-  docker stack rm "$name" || true
-  rm -rf "$repo_dest"
-  rm -rf "${repo_src}.old"
-  mv "$repo_src" "${repo_src}.old"
+  load_zcloud_env
+  declare appname="$1"
+  declare barerepo="$ZHOME/apps/$name"
+  declare repo="$ZHOME/.apps/$name"
+  cd "$repo"
+  waypoint destroy
+  cd -
+  rm -rf "$repo"
+  rm -rf "$barerepo"
 }
 
 cmd_git-post-receive() {
-  declare repo_src=$(readlink -f $GIT_DIR)
-  declare name=$(basename "$repo_src")
-  declare repo_dest="$ZGIT_HOME/.repo.${name}"
+  echo "-----> zcloud git post-receive hook received ..."
+  setup_env
+  declare barerepo=$(readlink -f $GIT_DIR)
+  declare appname=$(basename "$barerepo")
+  declare repo="$ZHOME/.apps/${appname}"
   declare branch=master
 
-  mkdir -p "$repo_dest"
+  mkdir -p "$repo"
 
   while read oldrev newrev ref
     do
       # only checking out the master
       if [ "$ref" = "refs/heads/$branch" ]; then
-        git --work-tree=$repo_dest --git-dir=$GIT_DIR checkout -f $branch
-        chown -R "$ZGIT_USER:$ZGIT_USER" "$repo_src" "$repo_dest"
+        git --work-tree=$repo --git-dir=$GIT_DIR checkout -f $branch
+        chown -R "$ZUSER:$ZUSER" "$barerepo" "$repo"
       else
         echo "Ref $ref received. Doing nothing: only the ${branch} branch may be deployed on this server."
-	exit 0
+        exit 0
       fi
   done
 
-  echo "-----> Deploying $name ..."
-  if [ -f "$repo_dest/waypoint.hcl" ]; then
-    cd "$repo_dest"
-    echo "-----> waypoint init $name ..."
+  echo "-----> Deploying $appname ..."
+  if [ -f "$repo/waypoint.hcl" ]; then
+    cd "$repo"
+    echo "-----> waypoint init $appname ..."
     waypoint init
-    echo "-----> waypoint init $name complete!"
-    echo "-----> waypoint up $name ..."
+    echo "-----> waypoint init $appname complete!"
+    echo "-----> waypoint up $appname ..."
     waypoint up -plain
-    echo "-----> waypoint up $name complete!"
+    echo "-----> waypoint up $appname complete!"
     cd -
-  elif [ -f "$repo_dest/docker-compose.yml" ]; then
-    docker stack deploy --prune -c "$repo_dest/docker-compose.yml" "$name"
-    echo "-----> Application Deployed!"
+  # elif [ -f "$repo_dest/docker-compose.yml" ]; then
+  #   docker stack deploy --prune -c "$repo_dest/docker-compose.yml" "$name"
+  #   echo "-----> Application Deployed!"
   else
-    echo "-----> Ignoring deployment due to missing waypoint.hcl and docker-compose.yml"
+    echo "-----> Ignoring deployment due to missing waypoint.hcl"
   fi
   echo
 }
@@ -257,4 +609,4 @@ case $subcommand in
   fi
   ;;
 esac
-# vim: set sw=2 ts=2 sts=2 et tw=78 foldmarker={{{,}}} foldmethod=marker spell:
+## vim: set sw=2 ts=2 sts=2 et tw=78 foldmarker={{{,}}} foldmethod=marker spell:
