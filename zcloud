@@ -250,7 +250,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 LimitNOFILE=1024
-ExecStart=/usr/local/bin/nomad agent -config=/etc/nomad.d
+ExecStart=/usr/local/bin/nomad agent -config /etc/nomad.d
 ExecReload=/bin/kill -HUP $MAINPID
 KillSignal=SIGINT
 TimeoutStopSec=5
