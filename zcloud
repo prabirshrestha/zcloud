@@ -301,6 +301,7 @@ waypoint_download() {
 
 waypoint_install() {
   cp "$ZTMP/waypoint" "/usr/local/bin/waypoint"
+  waypoint context clear
 }
 
 ## Create a git user on the system with home directory and
@@ -406,7 +407,7 @@ job "publicproxy" {
                 destination = "local/traefik.toml"
                 data = <<EOF
 [entryPoints]
-    [entryPoints.htp]
+    [entryPoints.http]
     address = ":80"
     # [entryPoints.traefik]
     # address = ":8081"
@@ -422,8 +423,8 @@ EOF
             }
 
             resources {
-                cpu     = 100
-                memory  = 128
+                # cpu     = 100
+                # memory  = 128
             }
         }
     }
