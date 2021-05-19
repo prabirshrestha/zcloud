@@ -544,8 +544,8 @@ cmd_destroy() {
   set -e
   load_zcloud_env
   declare appname="$1"
-  declare barerepo="$ZHOME/apps/$name"
-  declare repo="$ZHOME/.apps/$name"
+  declare barerepo="$ZHOME/apps/$appname"
+  declare repo="$ZHOME/.apps/$appname"
   cd "$repo"
   waypoint destroy
   cd -
