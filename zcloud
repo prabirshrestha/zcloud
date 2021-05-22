@@ -98,7 +98,7 @@ pkgs_install() {
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | $ZSUDO apt-key add -
     add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
     curl -fsSL https://apt.releases.hashicorp.com/gpg | sudo apt-key add -
-    sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
+    "$ZSUDO" apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
     "$ZPKG_MANAGER" update -y -qq
     "$ZPKG_MANAGER" install -y -qq git docker-ce docker-ce-cli containerd.io apt-transport-https ufw unzip
   fi
@@ -231,7 +231,6 @@ server {
 }
 client {
   enabled = true
-  servers = ["$ZSERVER_IP"]
 }
 EOF
   fi
@@ -249,15 +248,17 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-Type=simple
-LimitNOFILE=1024
 ExecStart=/usr/local/bin/nomad agent -config /etc/nomad.d
-ExecReload=/bin/kill -HUP $MAINPID
+KillMode=process
 KillSignal=SIGINT
-TimeoutStopSec=5
+LimitNOFILE=infinity
+LimitNPROC=infinity
 Restart=on-failure
-SyslogIdentifier=nomad
+RestartSec=2
+StartLimitBurst=3
+StartLimitIntervalSec=10
 TasksMax=infinity
+
 [Install]
 WantedBy=multi-user.target
 EOF
@@ -302,7 +303,6 @@ waypoint_download() {
 
 waypoint_install() {
   cp "$ZTMP/waypoint" "/usr/local/bin/waypoint"
-  waypoint context clear
 }
 
 ## Create a git user on the system with home directory and
@@ -466,7 +466,7 @@ cmd_help() {
   echo "   help             Show help"
 }
 
-cmd_init() {
+cmd_install() {
   setup_env
   if [ -d "$ZHOME" ]; then
     echo "$ZHOME exists. Please remove the directory before init."
@@ -481,18 +481,18 @@ cmd_init() {
   consul_download
   nomad_download
   waypoint_download
+  consul_stop
   consul_create_config
   consul_create_systemd_file
   consul_create_group_and_user
-  consul_stop
   consul_install
+  nomad_stop
   nomad_create_config
   nomad_create_systemd_file
-  nomad_stop
   nomad_install
   waypoint_install
-  git_create_user
-  publicproxy_setup
+  # git_create_user
+  # publicproxy_setup
   consul_status
   nomad_status
   echo
@@ -500,6 +500,18 @@ cmd_init() {
   echo
   echo "Be sure to upload a public key for your user to $ZHOME/.ssh/authorized_keys"
   echo
+}
+
+cmd_init() {
+  setup_env
+  create_env
+  exit
+  print_env
+  echo
+  nomad stop -purge waypoint-runner || true
+  nomad stop -purge waypoint-server || true
+  waypoint context clear
+  waypoint install -platform=nomad -accept-tos
 }
 
 load_zcloud_env() {

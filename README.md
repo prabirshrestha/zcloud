@@ -9,7 +9,8 @@ $ # login to ssh server and run the following commands
 $ ssh user@server
 $ wget https://raw.githubusercontent.com/prabirshrestha/zcloud/master/zcloud
 $ chmod +x zcloud
-$ sudo ZSERVER_IP=127.0.0.1 ./zcloud init
+$ sudo ZSERVER_IP=127.0.0.1 ./zcloud install
+$ ZSERVER_IP=127.0.0.1 ./zcloud init
 $ rm ./zcloud           # use zcloud from /home/zcloud/zcloud instead
 $ exit                  # exit from ssh server
 $ # copy ssh public key from local machine to server for git user
