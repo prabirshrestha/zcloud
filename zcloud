@@ -94,8 +94,6 @@ pkgs_install() {
     command -v git >/dev/null 2>&1 || { $ZSUDO "$ZPKG_MANAGER" -S --noconfirm --needed git; }
     command -v docker >/dev/null 2>&1 || { $ZSUDO "$ZPKG_MANAGER" -S --noconfirm --needed docker; }
     command -v ufw >/dev/null 2>&1 || { $ZSUDO "$ZPKG_MANAGER" -S --noconfirm --needed ufw; }
-    systemctl start docker
-    systemctl enable docker
   else
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | $ZSUDO apt-key add -
     add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
@@ -103,9 +101,9 @@ pkgs_install() {
     sudo apt-add-repository "deb [arch=amd64] https://apt.releases.hashicorp.com $(lsb_release -cs) main"
     "$ZPKG_MANAGER" update -y -qq
     "$ZPKG_MANAGER" install -y -qq git docker-ce docker-ce-cli containerd.io apt-transport-https ufw unzip
-    systemctl start docker
-    systemctl enable docker
   fi
+
+  command -v systemctl >/dev/null 2>&1 && { systemctl start docker; systemctl enable docker; }
 }
 
 firewall_setup() {
