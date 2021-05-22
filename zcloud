@@ -79,6 +79,7 @@ print_env() {
 
 create_tmp_dir() {
   mkdir -p "$ZTMP"
+  chmod -R a+rwX "$ZTMP"
 }
 
 pkgs_install() {
