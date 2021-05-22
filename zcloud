@@ -89,8 +89,10 @@ pkgs_install() {
   fi
 
   if [ "$ZPKG_MANAGER" = "pacman" ]; then
-    $ZSUDO "$ZPKG_MANAGER" -Syy
-    $ZSUDO "$ZPKG_MANAGER" -S --noconfirm git docker ufw
+    hash git docker ufw &>/dev/null || $ZSUDO "$ZPKG_MANAGER" -Syy
+    command -v git >/dev/null 2>&1 || { $ZSUDO "$ZPKG_MANAGER" -S --noconfirm --needed git; }
+    command -v docker >/dev/null 2>&1 || { $ZSUDO "$ZPKG_MANAGER" -S --noconfirm --needed docker; }
+    command -v ufw >/dev/null 2>&1 || { $ZSUDO "$ZPKG_MANAGER" -S --noconfirm --needed ufw; }
     systemctl start docker
     systemctl enable docker
   else
@@ -478,17 +480,17 @@ cmd_init() {
   pkgs_install
   firewall_setup
   consul_download
+  nomad_download
+  waypoint_download
   consul_create_config
   consul_create_systemd_file
   consul_create_group_and_user
   consul_stop
   consul_install
-  nomad_download
   nomad_create_config
   nomad_create_systemd_file
   nomad_stop
   nomad_install
-  waypoint_download
   waypoint_install
   git_create_user
   publicproxy_setup
