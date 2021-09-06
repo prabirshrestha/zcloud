@@ -34,20 +34,20 @@ setup_env() {
         ;;
     esac
   fi
-  export ZCONSUL_VERSION="${ZCONSUL_VERSION:-1.9.5}"
+  export ZCONSUL_VERSION="${ZCONSUL_VERSION:-1.10.2}"
   export ZCONSUL_URL="${ZCONSUL_URL:-https://releases.hashicorp.com/consul/${ZCONSUL_VERSION}/consul_${ZCONSUL_VERSION}_${ZOS}_${ZARCH}.zip}"
   export ZCONSUL_CONFIG_DIR="${ZCONSUL_CONFIG_DIR:-/consul/config}"
   export ZCONSUL_GROUP="${ZCONSUL_GROUP:-consul}"
   export ZCONSUL_USER="${ZCONSUL_USER:-consul}"
   export ZCONSUL_ENCRYPT="${ZCONSUL_ENCRYPT:-}"
 
-  export ZNOMAD_VERSION="${ZNOMAD_VERSION:-1.1.0}"
+  export ZNOMAD_VERSION="${ZNOMAD_VERSION:-1.1.4}"
   export ZNOMAD_URL="${ZNOMAD_URL:-https://releases.hashicorp.com/nomad/${ZNOMAD_VERSION}/nomad_${ZNOMAD_VERSION}_${ZOS}_${ZARCH}.zip}"
 
-  export ZWAYPOINT_VERSION="${ZWAYPOINT_VERSION:-0.3.2}"
+  export ZWAYPOINT_VERSION="${ZWAYPOINT_VERSION:-0.5.1}"
   export ZWAYPOINT_URL="${ZWAYPOINT_URL:-https://releases.hashicorp.com/waypoint/${ZWAYPOINT_VERSION}/waypoint_${ZWAYPOINT_VERSION}_linux_${ZARCH}.zip}"
 
-  export ZTRAEFIK_VERSION="${ZTRAEFIK_VERSION:-2.4.8}"
+  export ZTRAEFIK_VERSION="${ZTRAEFIK_VERSION:-2.5.2}"
 
   export ZHOME="${ZHOME:-/home/zcloud}"
   export ZUSER="${ZUSER:-zcloud}"
